@@ -27,9 +27,9 @@ class GTSRBDataset(Dataset):
 
 # Let's test if it successfully loads and resizes the first image
 if __name__ == "__main__":
-    # Resize to 32x32 and convert to a PyTorch tensor
+    # Resize to 49x49 and convert to a PyTorch tensor
     my_transform = transforms.Compose([
-        transforms.Resize((32, 32)), 
+        transforms.Resize((49, 49)), 
         transforms.ToTensor()
     ])
     

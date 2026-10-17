@@ -22,10 +22,10 @@ class TrafficSignNet(nn.Module):
         self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
         
         # Fully Connected Classifier
-        # After three 2x2 poolings, a 32x32 image becomes 4x4. 
-        # 128 channels * 4 * 4 = 2048 flattened features
+        # After three 2x2 poolings, a 49x49 image becomes 6x6. 
+        # 128 channels * 6 * 6 = 4608 flattened features
         self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(2048, 512)
+        self.fc1 = nn.Linear(4608, 512)
         self.act4 = nn.GELU()
         self.drop2 = nn.Dropout(p=0.5)
         self.fc2 = nn.Linear(512, num_classes)
@@ -42,8 +42,8 @@ class TrafficSignNet(nn.Module):
 # Test the architecture with a dummy image
 if __name__ == "__main__":
     model = TrafficSignNet(num_classes=43)
-    # Create a fake batch of 5 images, 3 color channels, 32x32 pixels
-    dummy_input = torch.randn(5, 3, 32, 32)
+    # Create a fake batch of 5 images, 3 color channels, 49x49 pixels
+    dummy_input = torch.randn(5, 3, 49, 49)
     output = model(dummy_input)
     
     print("Model initialized successfully!")

@@ -1,3 +1,4 @@
+import os
 import torch
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
@@ -5,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, ConfusionMatrixDisplay
 
+from tqdm import tqdm
 from dataset_loader import GTSRBDataset
 from model import TrafficSignNet
 
@@ -12,18 +14,22 @@ def evaluate_baseline():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Evaluating on device: {device}")
 
-    # Load test dataset
+    # Load test dataset with 49x49 resolution
     transform = transforms.Compose([
-        transforms.Resize((32, 32)),
+        transforms.Resize((49, 49)),
         transforms.ToTensor()
     ])
     
     test_dataset = GTSRBDataset(csv_file='data/Test.csv', root_dir='data', transform=transform)
     test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
 
-    # Load trained weights
+    # Load trained weights from output/
+    model_path = os.path.join('output', 'baseline_model.pth')
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"Model file '{model_path}' not found. Please run train.py first.")
+
     model = TrafficSignNet(num_classes=43).to(device)
-    model.load_state_dict(torch.load('baseline_model.pth', weights_only=True))
+    model.load_state_dict(torch.load(model_path, weights_only=True))
     model.eval()
 
     all_preds = []
@@ -31,7 +37,7 @@ def evaluate_baseline():
 
     print("Running evaluation on clean test set...")
     with torch.no_grad():
-        for images, labels in test_loader:
+        for images, labels in tqdm(test_loader, desc="Evaluating Baseline", leave=True):
             images = images.to(device)
             outputs = model(images)
             _, preds = torch.max(outputs, 1)
@@ -47,15 +53,17 @@ def evaluate_baseline():
     print(f"Test Accuracy: {acc:.2f}%")
     print(f"Macro F1-Score: {macro_f1:.4f}")
 
-    # Plot and save confusion matrix as PDF (per guideline requirement)
+    # Save baseline confusion matrix to output/baseline/
+    os.makedirs(os.path.join('output', 'baseline'), exist_ok=True)
     fig, ax = plt.subplots(figsize=(12, 12))
     cm = confusion_matrix(all_labels, all_preds)
     disp = ConfusionMatrixDisplay(confusion_matrix=cm)
     disp.plot(ax=ax, cmap='Blues', colorbar=False)
-    plt.title("Baseline Confusion Matrix (Clean Data)")
+    plt.title("Baseline Confusion Matrix (Clean Data - 49x49)")
     plt.tight_layout()
-    plt.savefig("baseline_confusion_matrix.pdf", format="pdf")
-    print("Confusion matrix saved to 'baseline_confusion_matrix.pdf'.")
+    pdf_path = os.path.join('output', 'baseline', 'baseline_confusion_matrix.pdf')
+    plt.savefig(pdf_path, format="pdf")
+    print(f"Confusion matrix saved to '{pdf_path}'.")
 
 if __name__ == "__main__":
     evaluate_baseline()

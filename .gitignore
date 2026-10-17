@@ -1,0 +1,17 @@
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Python Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# PyTorch Checkpoints (if user doesn't want large model weights in git)
+# *.pth
+
+# OS generated
+.DS_Store
+Thumbs.db

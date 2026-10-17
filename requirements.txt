@@ -1,0 +1,10 @@
+setuptools<70
+torch
+torchvision
+numpy
+pandas
+pillow
+matplotlib
+scikit-learn
+imagecorruptions
+tqdm
