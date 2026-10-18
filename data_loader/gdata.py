@@ -4,179 +4,129 @@ import tensorflow as tf
 from sklearn.model_selection import train_test_split
 
 # ============================================================
-# 1. PATHS
+# 1. PATHS (Dynamic resolution relative to project root)
 # ============================================================
 
-DATASET_ROOT = r"D:\python\Me\Images\gtsrb-german-traffic-sign\versions\1"
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATASET_ROOT = os.environ.get(
+    "GTSRB_DATASET_ROOT",
+    os.path.join(PROJECT_ROOT, "Images", "gtsrb-german-traffic-sign", "versions", "1")
+)
 
 TRAIN_CSV = os.path.join(DATASET_ROOT, "Train.csv")
 TEST_CSV = os.path.join(DATASET_ROOT, "Test.csv")
 
-
-# ============================================================
-# 2. LOAD CSV
-# ============================================================
-
-train_df = pd.read_csv(TRAIN_CSV)
-test_df = pd.read_csv(TEST_CSV)
-
-print("Original training images:", len(train_df))
-print("Testing images:", len(test_df))
+IMG_SIZE = (49, 49)
+BATCH_SIZE = 32
 
 
 # ============================================================
-# 3. TRAIN / VALIDATION SPLIT
+# 2. IMAGE LOADING FUNCTION
 # ============================================================
-
-train_df, val_df = train_test_split(
-    train_df,
-    test_size=0.20,
-    random_state=42,
-    stratify=train_df["ClassId"]
-)
-
-print("Training images:", len(train_df))
-print("Validation images:", len(val_df))
-print("Testing images:", len(test_df))
-
-
-# ============================================================
-# 4. CREATE IMAGE PATHS AND LABELS
-# ============================================================
-
-train_paths = [
-    os.path.join(DATASET_ROOT, path)
-    for path in train_df["Path"]
-]
-
-val_paths = [
-    os.path.join(DATASET_ROOT, path)
-    for path in val_df["Path"]
-]
-
-test_paths = [
-    os.path.join(DATASET_ROOT, path)
-    for path in test_df["Path"]
-]
-
-train_labels = train_df["ClassId"].values
-val_labels = val_df["ClassId"].values
-test_labels = test_df["ClassId"].values
-
-
-# ============================================================
-# 5. IMAGE LOADING FUNCTION
-# ============================================================
-
-IMG_SIZE = (128, 128)
-
 
 def load_image(path, label):
-
     image = tf.io.read_file(path)
-
-    image = tf.image.decode_png(
-        image,
-        channels=3
-    )
-
-    image = tf.image.resize(
-        image,
-        IMG_SIZE
-    )
-
+    image = tf.image.decode_png(image, channels=3)
+    image = tf.image.resize(image, IMG_SIZE)
     image = tf.cast(image, tf.float32) / 255.0
-
     return image, label
 
 
 # ============================================================
-# 6. CREATE TENSORFLOW DATASETS
+# 3. DATASET BUILDER
 # ============================================================
 
-train_dataset = tf.data.Dataset.from_tensor_slices(
-    (train_paths, train_labels)
-)
+def build_datasets(batch_size=BATCH_SIZE, img_size=IMG_SIZE, shuffle_buffer=1000):
+    train_df = pd.read_csv(TRAIN_CSV)
+    test_df = pd.read_csv(TEST_CSV)
 
-val_dataset = tf.data.Dataset.from_tensor_slices(
-    (val_paths, val_labels)
-)
-
-test_dataset = tf.data.Dataset.from_tensor_slices(
-    (test_paths, test_labels)
-)
-
-
-# ============================================================
-# 7. LOAD AND PREPROCESS IMAGES
-# ============================================================
-
-train_dataset = train_dataset.map(
-    load_image,
-    num_parallel_calls=tf.data.AUTOTUNE
-)
-
-val_dataset = val_dataset.map(
-    load_image,
-    num_parallel_calls=tf.data.AUTOTUNE
-)
-
-test_dataset = test_dataset.map(
-    load_image,
-    num_parallel_calls=tf.data.AUTOTUNE
-)
-
-
-# ============================================================
-# 8. BATCHING
-# ============================================================
-
-BATCH_SIZE = 32
-
-train_dataset = train_dataset.batch(BATCH_SIZE)
-val_dataset = val_dataset.batch(BATCH_SIZE)
-test_dataset = test_dataset.batch(BATCH_SIZE)
-
-
-# ============================================================
-# 9. PREFETCH
-# ============================================================
-
-train_dataset = train_dataset.prefetch(tf.data.AUTOTUNE)
-val_dataset = val_dataset.prefetch(tf.data.AUTOTUNE)
-test_dataset = test_dataset.prefetch(tf.data.AUTOTUNE)
-
-
-# ============================================================
-# 10. VERIFY
-# ============================================================
-
-for images, labels in train_dataset.take(1):
-
-    print("\nTrain batch:")
-    print("Images:", images.shape)
-    print("Labels:", labels.shape)
-
-    print("First image:", images[0].shape)
-    print("First label:", labels[0].numpy())
-
-    print(
-        "Pixel range:",
-        tf.reduce_min(images).numpy(),
-        "to",
-        tf.reduce_max(images).numpy()
+    train_df, val_df = train_test_split(
+        train_df,
+        test_size=0.20,
+        random_state=42,
+        stratify=train_df["ClassId"]
     )
 
+    train_paths = [os.path.join(DATASET_ROOT, p) for p in train_df["Path"]]
+    val_paths = [os.path.join(DATASET_ROOT, p) for p in val_df["Path"]]
+    test_paths = [os.path.join(DATASET_ROOT, p) for p in test_df["Path"]]
 
-for images, labels in val_dataset.take(1):
+    train_labels = train_df["ClassId"].values
+    val_labels = val_df["ClassId"].values
+    test_labels = test_df["ClassId"].values
 
-    print("\nValidation batch:")
-    print("Images:", images.shape)
-    print("Labels:", labels.shape)
+    def _loader(path, label):
+        image = tf.io.read_file(path)
+        image = tf.image.decode_png(image, channels=3)
+        image = tf.image.resize(image, img_size)
+        image = tf.cast(image, tf.float32) / 255.0
+        return image, label
+
+    train_ds = tf.data.Dataset.from_tensor_slices((train_paths, train_labels))
+    val_ds = tf.data.Dataset.from_tensor_slices((val_paths, val_labels))
+    test_ds = tf.data.Dataset.from_tensor_slices((test_paths, test_labels))
+
+    train_ds = (
+        train_ds.map(_loader, num_parallel_calls=tf.data.AUTOTUNE)
+        .shuffle(buffer_size=shuffle_buffer, seed=42, reshuffle_each_iteration=True)
+        .batch(batch_size)
+        .prefetch(tf.data.AUTOTUNE)
+    )
+
+    val_ds = (
+        val_ds.map(_loader, num_parallel_calls=tf.data.AUTOTUNE)
+        .batch(batch_size)
+        .prefetch(tf.data.AUTOTUNE)
+    )
+
+    test_ds = (
+        test_ds.map(_loader, num_parallel_calls=tf.data.AUTOTUNE)
+        .batch(batch_size)
+        .prefetch(tf.data.AUTOTUNE)
+    )
+
+    return train_ds, val_ds, test_ds, train_labels, val_labels, test_labels
 
 
-for images, labels in test_dataset.take(1):
+# ============================================================
+# 4. MODULE-LEVEL EXPORTS (Backward compatibility)
+# ============================================================
 
-    print("\nTest batch:")
-    print("Images:", images.shape)
-    print("Labels:", labels.shape)
+train_dataset, val_dataset, test_dataset, train_labels, val_labels, test_labels = build_datasets()
+
+
+# ============================================================
+# 5. VERIFICATION (Runs only when executed directly)
+# ============================================================
+
+if __name__ == "__main__":
+    train_df = pd.read_csv(TRAIN_CSV)
+    test_df = pd.read_csv(TEST_CSV)
+    print("Original training images:", len(train_df))
+    print("Testing images:", len(test_df))
+    print("Training labels count:", len(train_labels))
+    print("Validation labels count:", len(val_labels))
+    print("Testing labels count:", len(test_labels))
+
+    for images, labels in train_dataset.take(1):
+        print("\nTrain batch:")
+        print("Images:", images.shape)
+        print("Labels:", labels.shape)
+        print("First image:", images[0].shape)
+        print("First label:", labels[0].numpy())
+        print(
+            "Pixel range:",
+            tf.reduce_min(images).numpy(),
+            "to",
+            tf.reduce_max(images).numpy()
+        )
+
+    for images, labels in val_dataset.take(1):
+        print("\nValidation batch:")
+        print("Images:", images.shape)
+        print("Labels:", labels.shape)
+
+    for images, labels in test_dataset.take(1):
+        print("\nTest batch:")
+        print("Images:", images.shape)
+        print("Labels:", labels.shape)

@@ -5,9 +5,12 @@ import json
 from collections import defaultdict
 
 def analyze_dataset():
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    images_dir = os.path.join(project_root, "Images")
+
     # 1. GTSRB
     print("=== GTSRB ===")
-    gtsrb_dir = r"d:\python\Me\Images\gtsrb-german-traffic-sign\versions\1"
+    gtsrb_dir = os.path.join(images_dir, "gtsrb-german-traffic-sign", "versions", "1")
     
     # annotations
     train_csv = pd.read_csv(os.path.join(gtsrb_dir, "Train.csv"))
@@ -53,7 +56,7 @@ def analyze_dataset():
     
     # 2. CTSD
     print("\n=== CTSD ===")
-    ctsd_dir = r"d:\python\Me\Images\chinese-traffic-signs\versions\2"
+    ctsd_dir = os.path.join(images_dir, "chinese-traffic-signs", "versions", "2")
     annotations = pd.read_csv(os.path.join(ctsd_dir, "annotations.csv"))
     print(f"annotations.csv: {annotations.shape}, cols: {list(annotations.columns)}")
     
@@ -88,7 +91,7 @@ def analyze_dataset():
     
     # 3. BelgiumTSC
     print("\n=== BelgiumTSC ===")
-    belgium_dir = r"d:\python\Me\Images\belgium-ts\versions\10"
+    belgium_dir = os.path.join(images_dir, "belgium-ts", "versions", "10")
     
     for d in os.listdir(belgium_dir):
         print(f"Subdir: {d}")

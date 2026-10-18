@@ -101,12 +101,12 @@ This is the main difference between the two loaders.
 **`gdata.py`** — uses native TensorFlow ops (faster, no Python overhead):
 
 ```python
-IMG_SIZE = (128, 128)
+IMG_SIZE = (49, 49)
 
 def load_image(path, label):
     image = tf.io.read_file(path)                   # read raw bytes
     image = tf.image.decode_png(image, channels=3)  # decode PNG -> tensor
-    image = tf.image.resize(image, IMG_SIZE)         # resize to 128x128
+    image = tf.image.resize(image, IMG_SIZE)         # resize to 49x49
     image = tf.cast(image, tf.float32) / 255.0       # normalize to [0.0, 1.0]
     return image, label
 ```
@@ -118,7 +118,7 @@ PIL runs in Python, so it must be wrapped with `tf.py_function` to work inside `
 def load_image(path, label):
     path = path.numpy().decode("utf-8")     # convert TF tensor -> Python string
     image = Image.open(path).convert("RGB") # open PPM with PIL
-    image = image.resize(IMG_SIZE)          # resize to 128x128
+    image = image.resize(IMG_SIZE)          # resize to 49x49
     image = np.array(image, dtype=np.float32)
     image = image / 255.0                   # normalize to [0.0, 1.0]
     return image, np.int32(label)
@@ -237,7 +237,7 @@ tf.data.Dataset.from_tensor_slices()
       |
       v
 .map(load_image, AUTOTUNE)
-  -> (image_tensor, label) -- shape (128, 128, 3), normalized [0, 1]
+  -> (image_tensor, label) -- shape (49, 49, 3), normalized [0, 1]
       |
       v
 .batch(32)
@@ -254,7 +254,7 @@ tf.data.Dataset.from_tensor_slices()
 
 | Constant | Value | Purpose |
 |---|---|---|
-| `IMG_SIZE` | `(128, 128)` | All images resized to this |
+| `IMG_SIZE` | `(49, 49)` | All images resized to this |
 | `BATCH_SIZE` | `32` | Number of images per batch |
 | `test_size` | `0.20` | 20% of training data used for validation |
 | `random_state` | `42` | Fixed seed for reproducible splits |

@@ -1,53 +1,74 @@
+import sys
+import os
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if PROJECT_ROOT not in sys.path:
+    sys.path.insert(0, PROJECT_ROOT)
+
+import numpy as np
 import tensorflow as tf
-from sklearn.metrics import accuracy_score,precision_score,recall_score,f1_score,confusion_matrix,classification_report
-
-from data_loader.bdata import test_dataset
-
-model = tf.keras.models.load_model("belgium_cnn.keras")
-
-actualY = []
-for img, lbl in test_dataset:
-    actualY.extend(lbl.numpy())
-
-actualY = tf.convert_to_tensor(actualY)
-
-predY = model.predict(test_dataset)
-
-predY = predY.argmax(axis = 1)
-
-
-#Metrics
-accuracy = accuracy_score(actualY, predY)
-precision = precision_score(actualY, predY, average="weighted", zero_division = 0)
-recall = recall_score(actualY, predY, average="weighted", zero_division = 0)
-f1 = f1_score(actualY, predY, average="weighted", zero_division = 0)
-f1Macro = f1_score(actualY, predY, average="macro")
-
-print("Accuracy: ", accuracy)
-print("Precision: ", precision)
-print("Recall: ", recall)
-print("F1 Score: ", f1)
-print("F1 Macro: ", f1Macro)
-
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    confusion_matrix,
+    classification_report
+)
 import matplotlib.pyplot as plt
 import seaborn as sn
 
-confuse = confusion_matrix(actualY, predY)
+from data_loader.bdata import test_dataset, test_labels
 
-plt.figure(figsize=(20, 20))
+MODEL_PATH = os.path.join(PROJECT_ROOT, "belgium_cnn.keras")
+OUTPUT_PLOT_PATH = os.path.join(PROJECT_ROOT, "confusion_matrix_belgium.png")
 
-sn.heatmap(
-    confuse,
-    annot=True,
-    fmt="d",
-    cmap="Blues"
-)
+def evaluate():
+    if not os.path.exists(MODEL_PATH):
+        raise FileNotFoundError(f"Model file not found at: {MODEL_PATH}. Train the model first.")
 
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
-plt.title("Confusion Matrix")
+    print(f"Loading BelgiumTSC model from {MODEL_PATH}...")
+    model = tf.keras.models.load_model(MODEL_PATH)
 
-plt.show()
+    # Use direct test_labels (avoids decoding all test images twice)
+    actualY = np.array(test_labels)
 
-print("\nClassification Report:")
-print(classification_report(actualY, predY, zero_division = 0))
+    print("Generating predictions on test dataset...")
+    predY = model.predict(test_dataset)
+    predY = predY.argmax(axis=1)
+
+    # Compute classification metrics
+    accuracy = accuracy_score(actualY, predY)
+    precision = precision_score(actualY, predY, average="weighted", zero_division=0)
+    recall = recall_score(actualY, predY, average="weighted", zero_division=0)
+    f1 = f1_score(actualY, predY, average="weighted", zero_division=0)
+    f1_macro = f1_score(actualY, predY, average="macro", zero_division=0)
+
+    print("\n--- BelgiumTSC Evaluation Results ---")
+    print(f"Accuracy:  {accuracy:.4f}")
+    print(f"Precision: {precision:.4f}")
+    print(f"Recall:    {recall:.4f}")
+    print(f"F1 Score:  {f1:.4f}")
+    print(f"F1 Macro:  {f1_macro:.4f}")
+
+    # Generate Confusion Matrix
+    confuse = confusion_matrix(actualY, predY)
+    plt.figure(figsize=(20, 20))
+    sn.heatmap(
+        confuse,
+        annot=True,
+        fmt="d",
+        cmap="Blues"
+    )
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    plt.title("BelgiumTSC Confusion Matrix")
+    plt.savefig(OUTPUT_PLOT_PATH, bbox_inches="tight")
+    print(f"Confusion matrix plot saved to: {OUTPUT_PLOT_PATH}")
+    plt.close()
+
+    print("\nClassification Report:")
+    print(classification_report(actualY, predY, zero_division=0))
+
+if __name__ == "__main__":
+    evaluate()
