@@ -3,7 +3,7 @@ Modular Evaluation Pipeline for GTSRB Traffic Sign Recognition Models.
 
 Provides the Evaluator class with methods:
 - test_without_noise: evaluates clean test data, saves confusion matrix to output/<model_name>/test_without_noise.pdf
-- test_with_noise: evaluates across 14 noise types x 5 severities with parallelized noise injection & inference,
+- test_with_noise: evaluates across 14 noise types x 5 severities,
   saves 14 confusion matrices to output/<model_name>/noise/<noise>_severity_5.pdf,
   saves robustness_degradation.pdf and robustness_results.csv to output/<model_name>/
 - plot_robustness: helper to generate and save degradation curves
@@ -11,6 +11,8 @@ Provides the Evaluator class with methods:
 """
 
 import os
+import copy
+import argparse
 import numpy as np
 # NumPy 2.0+ compatibility shim for imagecorruptions
 if not hasattr(np, 'float_'):
@@ -34,7 +36,7 @@ class Evaluator:
     Evaluator class for benchmarking GTSRB traffic sign recognition models
     under clean and corrupted conditions.
     """
-    def __init__(self, data_dir='data', target_size=(49, 49), device=None, num_workers=None):
+    def __init__(self, data_dir='data', target_size=(49, 49), device=None, num_workers=0):
         self.data_dir = data_dir
         self.target_size = target_size
         if device is None:
@@ -42,11 +44,7 @@ class Evaluator:
         else:
             self.device = torch.device(device)
             
-        if num_workers is None:
-            self.num_workers = min(4, max(1, (os.cpu_count() or 2) // 2))
-        else:
-            self.num_workers = num_workers
-            
+        self.num_workers = num_workers if num_workers is not None else 0
         print(f"[Evaluator] Initialized on device: {self.device} (Target: {self.target_size}, Workers: {self.num_workers})")
 
     def test_without_noise(self, model_instance, test_dataset, model_name="baseline", batch_size=64):
@@ -95,10 +93,10 @@ class Evaluator:
             'pdf_path': pdf_path
         }
 
-    def test_with_noise(self, model_instance, test_dataset, model_name="baseline", batch_size=128, num_workers=None):
+    def test_with_noise(self, model_instance, test_dataset, model_name="baseline", batch_size=128, num_workers=0, use_adabn=False):
         """
         Evaluates the model across 14 noise types at 5 severity levels (70 experiments).
-        Noise injection, downscaling, and inference are parallelized.
+        If use_adabn is True, adapts BatchNorm layers (AdaBN) before testing each corruption.
         
         Saves:
         - 14 confusion matrices for severity 5 to output/<model_name>/noise/<noise_type>_severity_5.pdf
@@ -110,7 +108,8 @@ class Evaluator:
             test_dataset: Base test dataset or CSV path.
             model_name: Name of the model directory (default: 'baseline').
             batch_size: Batch size for corrupted DataLoader.
-            num_workers: Number of DataLoader parallel worker processes for noise generation & downscaling.
+            num_workers: Number of DataLoader worker processes (default: 0).
+            use_adabn: If True, perform test-time adaptation via AdaBN for each test condition.
             
         Returns:
             pd.DataFrame: Table of results across all corruptions and severities.
@@ -118,7 +117,8 @@ class Evaluator:
         if num_workers is None:
             num_workers = self.num_workers
 
-        output_dir = os.path.join('output', model_name)
+        output_subdir = f"{model_name}_adabn" if use_adabn else model_name
+        output_dir = os.path.join('output', output_subdir)
         noise_dir = os.path.join(output_dir, 'noise')
         os.makedirs(noise_dir, exist_ok=True)
 
@@ -132,12 +132,17 @@ class Evaluator:
         if num_workers > 0:
             loader_kwargs['prefetch_factor'] = 2
 
-        print(f"\n[Evaluator] Running robustness benchmark across {len(NOISE_TYPES)} corruptions x 5 severities...")
-        print(f"[Evaluator] Parallelizing noise injection & downscaling with num_workers={num_workers} (Inference on {self.device})")
+        adabn_str = " [WITH AdaBN TEST-TIME ADAPTATION]" if use_adabn else ""
+        print(f"\n[Evaluator] Running robustness benchmark{adabn_str} across {len(NOISE_TYPES)} corruptions x 5 severities...")
+        print(f"[Evaluator] Output directory: '{output_dir}'")
+
+        # Snapshot clean source state dict so each corruption adapts independently
+        if use_adabn:
+            source_state = copy.deepcopy(model_instance.state_dict())
 
         results = []
         total_experiments = len(NOISE_TYPES) * 5
-        progress_bar = tqdm(total=total_experiments, desc=f"Robustness Benchmark ({model_name})", leave=True)
+        progress_bar = tqdm(total=total_experiments, desc=f"Robustness Benchmark ({output_subdir})", leave=True)
 
         for noise_type in NOISE_TYPES:
             for severity in range(1, 6):
@@ -151,6 +156,12 @@ class Evaluator:
                 )
 
                 corrupted_loader = DataLoader(corrupted_ds, **loader_kwargs)
+
+                # AdaBN: reset to source weights and adapt BatchNorm statistics on target samples
+                if use_adabn:
+                    model_instance.load_state_dict(copy.deepcopy(source_state))
+                    if hasattr(model_instance, 'adapt_bn'):
+                        model_instance.adapt_bn(corrupted_loader, device=self.device, verbose=False)
 
                 preds, labels = model_instance.test(corrupted_loader, device=self.device)
                 acc = accuracy_score(labels, preds) * 100
@@ -177,6 +188,10 @@ class Evaluator:
                 progress_bar.update(1)
 
         progress_bar.close()
+
+        # Restore original source state if adapted
+        if use_adabn:
+            model_instance.load_state_dict(source_state)
 
         # Sort results consistently
         results.sort(key=lambda x: (NOISE_TYPES.index(x['Noise_Type']), x['Severity']))
@@ -240,28 +255,64 @@ class Evaluator:
         plt.close()
         print(f"[Evaluator] Robustness degradation plot saved to: '{output_path}'")
 
-    def eval_model(self, model_cls, model_name="baseline", epochs=5, batch_size=64, num_workers=None, load_if_exists=True):
+    def plot_comparison(self, baseline_csv, adabn_csv, output_path):
+        """
+        Plots a side-by-side comparison curve showing accuracy before and after AdaBN.
+        """
+        if not (os.path.exists(baseline_csv) and os.path.exists(adabn_csv)):
+            print(f"[Evaluator] Cannot plot comparison: '{baseline_csv}' or '{adabn_csv}' missing.")
+            return
+
+        base_df = pd.read_csv(baseline_csv)
+        adabn_df = pd.read_csv(adabn_csv)
+
+        # Compute average accuracy across all 14 noises per severity
+        base_avg = base_df.groupby('Severity')['Accuracy'].mean()
+        adabn_avg = adabn_df.groupby('Severity')['Accuracy'].mean()
+
+        plt.figure(figsize=(9, 6))
+        plt.plot(base_avg.index, base_avg.values, marker='o', color='#d9534f', linewidth=2.5, label='Standard Baseline (No Adaptation)')
+        plt.plot(adabn_avg.index, adabn_avg.values, marker='s', color='#0275d8', linewidth=2.5, label='AdaBN (Test-Time Adaptation)')
+
+        plt.title('Average Robustness: Standard Baseline vs. AdaBN', fontsize=14, fontweight='bold')
+        plt.xlabel('Corruption Severity Level (1 to 5)', fontsize=12)
+        plt.ylabel('Mean Accuracy Across 14 Noise Types (%)', fontsize=12)
+        plt.xticks([1, 2, 3, 4, 5])
+        plt.ylim(0, 100)
+        plt.grid(True, linestyle='--', alpha=0.6)
+        plt.legend(loc='lower left', fontsize=11)
+        plt.tight_layout()
+
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        plt.savefig(output_path, format='pdf')
+        plt.close()
+        print(f"[Evaluator] AdaBN comparison plot saved to: '{output_path}'")
+
+    def eval_model(self, model_cls, model_name="baseline", epochs=5, batch_size=64, num_workers=0, load_if_exists=True, use_adabn=False):
         """
         Main orchestration method:
         1. Loads train and test datasets scaled to target_size (49x49).
         2. Creates an instance of model_cls.
         3. Trains the model instance (or loads existing checkpoint if available and requested).
         4. Calls test_without_noise.
-        5. Calls test_with_noise.
+        5. Calls test_with_noise (with optional AdaBN adaptation).
         
         Args:
             model_cls: Class reference of the model (e.g., Baseline).
             model_name: Directory name under output/ (e.g., 'baseline').
             epochs: Training epochs if training from scratch.
             batch_size: Training batch size.
-            num_workers: Number of parallel DataLoader worker processes for noise generation & downscaling.
+            num_workers: Number of DataLoader worker processes (default: 0).
             load_if_exists: If True, attempts to load existing checkpoint before training.
+            use_adabn: If True, benchmarks using AdaBN test-time adaptation.
             
         Returns:
             dict: Summary containing clean results and robustness results dataframe.
         """
+        output_subdir = f"{model_name}_adabn" if use_adabn else model_name
         print(f"\n==========================================")
-        print(f" Starting Evaluation Pipeline for: {model_name}")
+        print(f" Starting Evaluation Pipeline for: {output_subdir}")
+        print(f" Mode: {'AdaBN Test-Time Adaptation' if use_adabn else 'Standard Clean/Noisy Evaluation'}")
         print(f"==========================================")
 
         # 1. Load train and test datasets scaled down to target_size (49x49)
@@ -295,7 +346,7 @@ class Evaluator:
         clean_results = self.test_without_noise(
             model_instance=model_instance,
             test_dataset=test_dataset,
-            model_name=model_name
+            model_name=output_subdir
         )
 
         # 5. Robustness evaluation with noise (test_with_noise)
@@ -303,22 +354,52 @@ class Evaluator:
             model_instance=model_instance,
             test_dataset=test_dataset,
             model_name=model_name,
-            num_workers=num_workers
+            num_workers=num_workers,
+            use_adabn=use_adabn
         )
 
+        # 6. If both baseline and AdaBN results exist, plot comparison
+        base_csv = os.path.join('output', model_name, 'robustness_results.csv')
+        adabn_csv = os.path.join('output', f"{model_name}_adabn", 'robustness_results.csv')
+        if os.path.exists(base_csv) and os.path.exists(adabn_csv):
+            comp_path = os.path.join('output', f"{model_name}_vs_adabn_comparison.pdf")
+            self.plot_comparison(base_csv, adabn_csv, comp_path)
+
         print(f"\n==========================================")
-        print(f" Finished Evaluation Pipeline for: {model_name}")
-        print(f" Output artifacts stored in: output/{model_name}/")
+        print(f" Finished Evaluation Pipeline for: {output_subdir}")
+        print(f" Output artifacts stored in: output/{output_subdir}/")
         print(f"==========================================\n")
 
         return {
-            'model_name': model_name,
+            'model_name': output_subdir,
             'clean_metrics': clean_results,
             'robustness_df': robustness_results
         }
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Evaluate GTSRB Traffic Sign Recognition Models")
+    parser.add_argument('--model', type=str, default='baseline', help="Model name (default: 'baseline')")
+    parser.add_argument('--adabn', action='store_true', help="Enable AdaBN (Adaptive Batch Normalization) at test time")
+    parser.add_argument('--batch-size', type=int, default=128, help="Inference batch size")
+    parser.add_argument('--num-workers', type=int, default=0, help="Number of workers for data loading (default: 0)")
+    parser.add_argument('--compare', action='store_true', help="Generate comparison plot from existing baseline & adabn CSVs")
+    args = parser.parse_args()
+
     from models.baseline.model import Baseline
     evaluator = Evaluator()
-    evaluator.eval_model(Baseline, model_name="baseline")
+
+    if args.compare:
+        base_csv = os.path.join('output', args.model, 'robustness_results.csv')
+        adabn_csv = os.path.join('output', f"{args.model}_adabn", 'robustness_results.csv')
+        comp_path = os.path.join('output', f"{args.model}_vs_adabn_comparison.pdf")
+        evaluator.plot_comparison(base_csv, adabn_csv, comp_path)
+    else:
+        evaluator.eval_model(
+            Baseline,
+            model_name=args.model,
+            use_adabn=args.adabn,
+            batch_size=args.batch_size,
+            num_workers=args.num_workers,
+            load_if_exists=True
+        )

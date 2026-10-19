@@ -17,53 +17,52 @@ from tqdm import tqdm
 
 class Baseline(nn.Module):
     """
-    Baseline CNN architecture for 49x49 GTSRB images.
-    Consists of 3 Conv blocks with GELU activations and Dropout,
-    followed by fully-connected classifier layers.
+    Simplified Baseline CNN architecture for 49x49 GTSRB images with Batch Normalization.
+    Consists of 3 Conv blocks with BatchNorm2d, ReLU activations, and Dropout,
+    followed by fully-connected classifier layers with BatchNorm1d.
+    Supports Adaptive Batch Normalization (AdaBN) for test-time adaptation.
     """
     def __init__(self, num_classes=43):
         super(Baseline, self).__init__()
         self.num_classes = num_classes
 
-        # Block 1
-        self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
-        self.act1 = nn.GELU()
-        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+        # Feature extractor: 3 Conv blocks with BatchNorm, ReLU, Pooling, and Dropout
+        self.features = nn.Sequential(
+            # Block 1: (3, 49, 49) -> (32, 24, 24)
+            nn.Conv2d(3, 32, kernel_size=3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
 
-        # Block 2
-        self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.act2 = nn.GELU()
-        self.drop1 = nn.Dropout2d(p=0.2)
-        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+            # Block 2: (32, 24, 24) -> (64, 12, 12)
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.BatchNorm2d(64),
+            nn.ReLU(inplace=True),
+            nn.Dropout2d(p=0.2),
+            nn.MaxPool2d(kernel_size=2, stride=2),
 
-        # Block 3
-        self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
-        self.act3 = nn.GELU()
-        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
+            # Block 3: (64, 12, 12) -> (128, 6, 6)
+            nn.Conv2d(64, 128, kernel_size=3, padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+        )
 
-        # Classifier: after three 2x2 poolings, 49x49 becomes 6x6. 128 * 6 * 6 = 4608 features.
-        self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(4608, 512)
-        self.act4 = nn.GELU()
-        self.drop2 = nn.Dropout(p=0.5)
-        self.fc2 = nn.Linear(512, num_classes)
+        # Classifier head: 128 * 6 * 6 = 4608 -> 512 -> num_classes (raw logits)
+        self.classifier = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(128 * 6 * 6, 512),
+            nn.BatchNorm1d(512),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.5),
+            nn.Linear(512, num_classes)  # Raw unnormalized logits output
+        )
 
     def forward(self, x):
-        x = self.pool1(self.act1(self.conv1(x)))
-        x = self.pool2(self.drop1(self.act2(self.conv2(x))))
-        x = self.pool3(self.act3(self.conv3(x)))
-        x = self.flatten(x)
-        x = self.drop2(self.act4(self.fc1(x)))
-        x = self.fc2(x)
-        return x
+        return self.classifier(self.features(x))
 
     def train(self, dataset_or_mode=True, epochs=5, batch_size=64, lr=0.001, device=None, save_dir='output/baseline', **kwargs):
-        """
-        Dual-purpose train method:
-        1. If passed a boolean (or called with no args), acts as standard PyTorch nn.Module.train(mode).
-        2. If passed a Dataset or DataLoader, executes the model training loop.
-        """
-        # Case 1: Standard PyTorch train mode toggle
+      
         if isinstance(dataset_or_mode, bool) and not kwargs and epochs == 5 and batch_size == 64:
             return super().train(mode=dataset_or_mode)
 
@@ -161,6 +160,55 @@ class Baseline(nn.Module):
 
         return all_preds, all_labels
 
+    def adapt_bn(self, target_dataset_or_loader, batch_size=64, device=None, verbose=True):
+        """
+        Adapts Batch Normalization layers to a target domain using AdaBN (Adaptive Batch Normalization).
+        
+        Freezes all weights and updates running_mean and running_var for all BatchNorm layers
+        using unlabeled target domain samples (e.g., corrupted images).
+        
+        Args:
+            target_dataset_or_loader: Dataset or DataLoader with target samples.
+            batch_size: Batch size to use if Dataset was provided.
+            device: Device to run adaptation on.
+            verbose: Whether to log completion message.
+        """
+        if device is None:
+            device = next(self.parameters()).device
+        self.to(device)
+
+        # 1. Reset running stats and set BatchNorm layers to update running average
+        for m in self.modules():
+            if isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
+                m.reset_running_stats()
+                m.momentum = None  # Computes simple cumulative average over the target data
+                m.train()          # Activates stats accumulation
+            else:
+                m.eval()           # Freezes Dropout and all other non-BN components
+
+        if isinstance(target_dataset_or_loader, DataLoader):
+            loader = target_dataset_or_loader
+        elif isinstance(target_dataset_or_loader, Dataset):
+            loader = DataLoader(target_dataset_or_loader, batch_size=batch_size, shuffle=False)
+        else:
+            raise TypeError("Expected Dataset or DataLoader for AdaBN adaptation.")
+
+        # 2. Forward pass over target data without computing gradients
+        with torch.no_grad():
+            for batch in loader:
+                images = batch[0] if isinstance(batch, (tuple, list)) else batch
+                images = images.to(device, non_blocking=True)
+                _ = self(images)
+
+        # 3. Restore eval mode and standard momentum
+        self.eval()
+        for m in self.modules():
+            if isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d)):
+                m.momentum = 0.1
+
+        if verbose:
+            print(f"[Baseline] AdaBN adaptation completed across {len(loader)} target batches.")
+
     def load_weights(self, weights_path=None):
         """Loads trained weights from specified path or default locations."""
         if weights_path is None:
@@ -175,9 +223,14 @@ class Baseline(nn.Module):
                     break
 
         if weights_path and os.path.exists(weights_path):
-            self.load_state_dict(torch.load(weights_path, weights_only=True, map_location='cpu'))
-            print(f"[Baseline] Successfully loaded weights from '{weights_path}'")
-            return True
+            try:
+                self.load_state_dict(torch.load(weights_path, weights_only=True, map_location='cpu'))
+                print(f"[Baseline] Successfully loaded weights from '{weights_path}'")
+                return True
+            except RuntimeError as e:
+                print(f"[Baseline] Checkpoint at '{weights_path}' is from an older architecture without BatchNorm.")
+                print(f"[Baseline] Retraining is needed to save new weights with BatchNorm.")
+                return False
         else:
             print(f"[Baseline] Warning: No checkpoint found at '{weights_path}'")
             return False
