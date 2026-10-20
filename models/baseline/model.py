@@ -76,7 +76,8 @@ class Baseline(nn.Module):
         if isinstance(train_data, DataLoader):
             train_loader = train_data
         elif isinstance(train_data, Dataset):
-            train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+            pin_mem = (device.type == "cuda")
+            train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True, pin_memory=pin_mem)
         else:
             raise TypeError("Expected Dataset or DataLoader for training.")
 
@@ -91,7 +92,8 @@ class Baseline(nn.Module):
 
             loop = tqdm(train_loader, desc=f"Epoch [{epoch+1}/{epochs}]", leave=True)
             for images, labels in loop:
-                images, labels = images.to(device), labels.to(device)
+                images = images.to(device, non_blocking=True)
+                labels = labels.to(device, non_blocking=True)
 
                 optimizer.zero_grad()
                 outputs = self(images)

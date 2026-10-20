@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, ConfusionMatrixDisplay
 from tqdm import tqdm
 
-from dataset_loader import GTSRBDataset, get_train_dataset, get_test_dataset
+from dataset_loader import GTSRBDataset, get_train_dataset, get_test_dataset, DATASET_CLASSES
 from noise import NOISE_TYPES, CorruptedGTSRBDataset
 
 
@@ -288,18 +288,19 @@ class Evaluator:
         plt.close()
         print(f"[Evaluator] AdaBN comparison plot saved to: '{output_path}'")
 
-    def eval_model(self, model_cls, model_name="baseline", epochs=5, batch_size=64, num_workers=0, load_if_exists=True, use_adabn=False):
+    def eval_model(self, model_cls, model_name=None, dataset='gtsrb', epochs=5, batch_size=64, num_workers=0, load_if_exists=True, use_adabn=False):
         """
         Main orchestration method:
-        1. Loads train and test datasets scaled to target_size (49x49).
-        2. Creates an instance of model_cls.
+        1. Loads train and test datasets scaled to target_size (49x49) for the specified dataset.
+        2. Creates an instance of model_cls with appropriate num_classes.
         3. Trains the model instance (or loads existing checkpoint if available and requested).
         4. Calls test_without_noise.
         5. Calls test_with_noise (with optional AdaBN adaptation).
         
         Args:
             model_cls: Class reference of the model (e.g., Baseline).
-            model_name: Directory name under output/ (e.g., 'baseline').
+            model_name: Directory name under output/ (e.g., 'baseline' or 'baseline_<dataset>').
+            dataset: Target dataset ('gtsrb', 'btsd', or 'ctsd').
             epochs: Training epochs if training from scratch.
             batch_size: Training batch size.
             num_workers: Number of DataLoader worker processes (default: 0).
@@ -309,23 +310,30 @@ class Evaluator:
         Returns:
             dict: Summary containing clean results and robustness results dataframe.
         """
+        if model_name is None:
+            model_name = f"baseline_{dataset}" if dataset != 'gtsrb' else "baseline"
+
         output_subdir = f"{model_name}_adabn" if use_adabn else model_name
+        num_classes = DATASET_CLASSES.get(dataset, 43)
+
         print(f"\n==========================================")
         print(f" Starting Evaluation Pipeline for: {output_subdir}")
+        print(f" Dataset: {dataset.upper()} ({num_classes} classes)")
         print(f" Mode: {'AdaBN Test-Time Adaptation' if use_adabn else 'Standard Clean/Noisy Evaluation'}")
         print(f"==========================================")
 
         # 1. Load train and test datasets scaled down to target_size (49x49)
-        test_csv = os.path.join(self.data_dir, 'Test.csv')
-        train_csv = os.path.join(self.data_dir, 'Train.csv')
-        
-        train_dataset = get_train_dataset(csv_file=train_csv, root_dir=self.data_dir, target_size=self.target_size)
-        test_dataset = get_test_dataset(csv_file=test_csv, root_dir=self.data_dir, target_size=self.target_size)
+        train_dataset = get_train_dataset(dataset=dataset, target_size=self.target_size)
+        test_dataset = get_test_dataset(dataset=dataset, target_size=self.target_size)
         print(f"[Evaluator] Loaded Train set ({len(train_dataset)} samples) and Test set ({len(test_dataset)} samples)")
 
         # 2. Create model instance
-        model_instance = model_cls(num_classes=43)
+        model_instance = model_cls(num_classes=num_classes)
         checkpoint_path = os.path.join('output', model_name, f"{model_name}_model.pth")
+        if not os.path.exists(checkpoint_path):
+            alt_path = os.path.join('output', model_name, 'baseline_model.pth')
+            if os.path.exists(alt_path):
+                checkpoint_path = alt_path
 
         # 3. Train or load existing weights
         weights_loaded = False
@@ -378,8 +386,9 @@ class Evaluator:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Evaluate GTSRB Traffic Sign Recognition Models")
-    parser.add_argument('--model', type=str, default='baseline', help="Model name (default: 'baseline')")
+    parser = argparse.ArgumentParser(description="Evaluate Traffic Sign Recognition Models")
+    parser.add_argument('--dataset', type=str, default='gtsrb', choices=['gtsrb', 'btsd', 'ctsd'], help="Target dataset (default: 'gtsrb')")
+    parser.add_argument('--model', type=str, default=None, help="Model name (default: baseline or baseline_<dataset>)")
     parser.add_argument('--adabn', action='store_true', help="Enable AdaBN (Adaptive Batch Normalization) at test time")
     parser.add_argument('--batch-size', type=int, default=128, help="Inference batch size")
     parser.add_argument('--num-workers', type=int, default=0, help="Number of workers for data loading (default: 0)")
@@ -389,15 +398,18 @@ if __name__ == "__main__":
     from models.baseline.model import Baseline
     evaluator = Evaluator()
 
+    model_name = args.model if args.model else (f"baseline_{args.dataset}" if args.dataset != 'gtsrb' else "baseline")
+
     if args.compare:
-        base_csv = os.path.join('output', args.model, 'robustness_results.csv')
-        adabn_csv = os.path.join('output', f"{args.model}_adabn", 'robustness_results.csv')
-        comp_path = os.path.join('output', f"{args.model}_vs_adabn_comparison.pdf")
+        base_csv = os.path.join('output', model_name, 'robustness_results.csv')
+        adabn_csv = os.path.join('output', f"{model_name}_adabn", 'robustness_results.csv')
+        comp_path = os.path.join('output', f"{model_name}_vs_adabn_comparison.pdf")
         evaluator.plot_comparison(base_csv, adabn_csv, comp_path)
     else:
         evaluator.eval_model(
             Baseline,
-            model_name=args.model,
+            model_name=model_name,
+            dataset=args.dataset,
             use_adabn=args.adabn,
             batch_size=args.batch_size,
             num_workers=args.num_workers,
