@@ -2,7 +2,7 @@
 Interactive Command-Line Interface (CLI) for Traffic Sign Model Evaluation.
 
 Dynamically scans the models/ directory, presents an interactive menu,
-resolves model configuration, and explicitly specifies all evaluation parameters to eval.py.
+and delegates evaluation to eval.py.
 """
 
 import os
@@ -11,7 +11,6 @@ import importlib
 import inspect
 import torch
 
-from dataset_loader import get_train_dataset, get_test_dataset, TOTAL_CLASSES
 from eval import Evaluator
 
 
@@ -86,8 +85,6 @@ def main():
                         help="Custom output directory. Defaults to 'output/<model_name>'.")
     parser.add_argument('--weights', type=str, default=None,
                         help="Explicit checkpoint file path to load.")
-    parser.add_argument('--no-adapt', action='store_true',
-                        help="Disable model test-time adaptation hook if the model provides one.")
     args = parser.parse_args()
 
     # Discover models dynamically from the directory structure
@@ -143,61 +140,24 @@ def main():
     print(f"\n--> Loaded class '{selected_model_cls.__name__}' dynamically from models/{selected_name}/model.py")
     print(f"--> Selected model: {selected_name.upper()}\n")
 
-    # Explicitly resolve all settings
-    target_size = (args.target_size, args.target_size)
-    device = args.device if args.device else ("cuda" if torch.cuda.is_available() else "cpu")
-    num_workers = args.workers if args.workers is not None else 0
-    output_dir = args.output_dir if args.output_dir else os.path.join('output', selected_name)
-    os.makedirs(output_dir, exist_ok=True)
-
-    # Explicitly resolve checkpoint path
-    if args.weights:
-        weights_path = args.weights
-    else:
-        candidates = [
-            os.path.join(output_dir, f"{selected_name}_model.pth"),
-            os.path.join(output_dir, 'model.pth'),
-            os.path.join('models', selected_name, f"{selected_name}_model.pth"),
-        ]
-        weights_path = next((c for c in candidates if os.path.exists(c)), candidates[0])
-
-    # Explicitly load train and test datasets
-    print(f"[CLI] Loading train and test datasets from '{args.data_dir}' (Target: {target_size})...")
-    train_dataset = get_train_dataset(root_dir=args.data_dir, target_size=target_size)
-    test_dataset = get_test_dataset(root_dir=args.data_dir, target_size=target_size)
-
-    # Instantiate model instance
-    model_instance = selected_model_cls(num_classes=TOTAL_CLASSES)
-
-    # Configure optional pre-test hook (e.g. test-time adaptation) if model supports it
-    pre_test_hook = None
-    if not args.no_adapt:
-        if hasattr(model_instance, 'adapt_bn'):
-            pre_test_hook = lambda m, loader: m.adapt_bn(loader, device=torch.device(device), verbose=False)
-        elif hasattr(model_instance, 'adapt'):
-            pre_test_hook = lambda m, loader: m.adapt(loader, device=torch.device(device))
-
-    # Initialize evaluator with every required parameter explicitly specified (no defaults)
+    # Initialize evaluator (eval handles hardware detection & dataset loading)
     evaluator = Evaluator(
         data_dir=args.data_dir,
-        target_size=target_size,
-        device=device,
-        num_workers=num_workers
+        target_size=(args.target_size, args.target_size),
+        device=args.device,
+        num_workers=args.workers
     )
 
-    # Execute full evaluation pipeline with all parameters explicitly specified
+    # Run evaluation
     evaluator.eval_model(
-        model_instance=model_instance,
+        model_cls_or_instance=selected_model_cls,
         model_name=selected_name,
-        output_dir=output_dir,
-        train_dataset=train_dataset,
-        test_dataset=test_dataset,
+        output_dir=args.output_dir,
         epochs=args.epochs,
         batch_size=args.batch_size,
-        num_workers=num_workers,
-        weights_path=weights_path,
-        load_if_exists=True,
-        pre_test_hook=pre_test_hook
+        num_workers=args.workers,
+        weights_path=args.weights,
+        load_if_exists=True
     )
 
 

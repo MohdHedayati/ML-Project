@@ -1,16 +1,18 @@
 """
 Model-Agnostic Evaluation Pipeline for Traffic Sign Recognition.
 
-Provides a completely generic evaluation engine for benchmarking neural network models
-under clean and corrupted conditions. Contains NO model-specific code or default assumptions;
-all configuration parameters, datasets, directories, devices, and hooks must be explicitly specified.
+Handles dataset loading, hardware setup (CUDA/CPU), clean evaluation, and 
+corruption robustness benchmarks. Completely model-agnostic: does NOT import 
+any specific neural network model. Any model adhering to the project interface 
+can be evaluated by passing its class or instance.
 
 Methods:
 - test_without_noise: evaluates clean test data, saves confusion matrix to <output_dir>/test_without_noise.pdf
 - test_with_noise: evaluates across 14 noise types x 5 severities,
   saves 14 confusion matrices to <output_dir>/noise/<noise>_severity_5.pdf,
   saves robustness_degradation.pdf and robustness_results.csv to <output_dir>/
-- eval_model: orchestrates full pipeline (checkpoint loading/training, clean eval, robustness benchmark)
+- eval_model: orchestrates dataset loading, hardware detection, training/checkpoint loading,
+  clean evaluation, and robustness benchmarks for any passed model.
 """
 
 import os
@@ -30,27 +32,30 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, ConfusionMatrixDisplay
 from tqdm import tqdm
 
-from dataset_loader import TOTAL_CLASSES
+from dataset_loader import get_train_dataset, get_test_dataset, TOTAL_CLASSES
 from noise import NOISE_TYPES, CorruptedGTSRBDataset
 
 
 class Evaluator:
     """
-    Model-agnostic evaluator class for benchmarking traffic sign recognition models
-    under clean and corrupted conditions.
-    
-    Contains NO default values or model-specific logic; all settings must be specified.
+    Evaluation engine for traffic sign recognition models.
+    Manages dataset loading, hardware resource detection (GPU/CPU), and evaluation benchmarks.
+    Does not import or couple to any specific model architecture.
     """
-    def __init__(self, data_dir, target_size, device, num_workers):
+    def __init__(self, data_dir='data', target_size=(49, 49), device=None, num_workers=4):
         self.data_dir = data_dir
         self.target_size = tuple(target_size)
-        self.device = torch.device(device)
-        self.num_workers = int(num_workers)
+        if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device(device)
+            
+        self.num_workers = num_workers if num_workers is not None else 0
         print(f"[Evaluator] Initialized on device: {self.device} (Target Size: {self.target_size}, Workers: {self.num_workers})")
 
-    def test_without_noise(self, model_instance, test_dataset, output_dir, batch_size):
+    def test_without_noise(self, model_instance, test_dataset, output_dir, batch_size=64):
         """
-        Evaluates the model on clean data (without noise) scaled to target_size.
+        Evaluates the model on clean test data scaled to target_size.
         Generates and saves a confusion matrix to <output_dir>/test_without_noise.pdf.
         """
         os.makedirs(output_dir, exist_ok=True)
@@ -88,19 +93,22 @@ class Evaluator:
             'pdf_path': pdf_path
         }
 
-    def test_with_noise(self, model_instance, test_dataset, output_dir, batch_size, num_workers, pre_test_hook):
+    def test_with_noise(self, model_instance, test_dataset, output_dir, batch_size=128, num_workers=None, pre_test_hook=None):
         """
         Evaluates the model across 14 noise types at 5 severity levels (70 experiments).
         
         Args:
-            model_instance: Initialized model instance complying with the model interface contract.
+            model_instance: Model instance conforming to model interface contract.
             test_dataset: PyTorch Dataset of test samples.
             output_dir: Destination directory for artifacts and matrices.
             batch_size: Mini-batch size for DataLoader.
             num_workers: Multiprocessing worker count for parallel noise generation.
-            pre_test_hook: Optional callable hook `pre_test_hook(model_instance, corrupted_loader)`
-                           invoked before evaluating each corruption (e.g. for test-time adaptation).
+            pre_test_hook: Optional callable `pre_test_hook(model_instance, corrupted_loader)`
+                           invoked before evaluating each corruption (e.g. test-time adaptation).
         """
+        if num_workers is None:
+            num_workers = self.num_workers
+
         noise_dir = os.path.join(output_dir, 'noise')
         os.makedirs(noise_dir, exist_ok=True)
 
@@ -114,7 +122,7 @@ class Evaluator:
         if num_workers > 0:
             loader_kwargs['prefetch_factor'] = 2
 
-        hook_status = f" [Pre-Test Hook: {pre_test_hook.__name__ if hasattr(pre_test_hook, '__name__') else 'Active'}]" if pre_test_hook else ""
+        hook_status = f" [Pre-Test Hook Active]" if pre_test_hook else ""
         print(f"\n[Evaluator] Running robustness benchmark{hook_status} across {len(NOISE_TYPES)} corruptions x 5 severities...")
         print(f"[Evaluator] Output directory: '{output_dir}'")
 
@@ -223,44 +231,68 @@ class Evaluator:
 
     def eval_model(
         self,
-        model_instance,
+        model_cls_or_instance,
         model_name,
-        output_dir,
-        train_dataset,
-        test_dataset,
-        epochs,
-        batch_size,
-        num_workers,
-        weights_path,
-        load_if_exists,
-        pre_test_hook
+        output_dir=None,
+        train_dataset=None,
+        test_dataset=None,
+        epochs=5,
+        batch_size=64,
+        num_workers=None,
+        weights_path=None,
+        load_if_exists=True,
+        pre_test_hook=None
     ):
         """
         Main orchestration method:
-        1. Prepares model instance.
-        2. Loads existing checkpoint from weights_path or trains on train_dataset.
-        3. Runs clean evaluation (test_without_noise).
-        4. Runs corrupted robustness benchmark (test_with_noise).
+        1. Loads datasets if not already supplied.
+        2. Instantiates model if class type was passed.
+        3. Loads checkpoint or trains model.
+        4. Configures adaptation hook if model provides one (e.g. adapt_bn).
+        5. Runs clean evaluation and corrupted benchmark.
         """
+        output_dir = output_dir or os.path.join('output', model_name)
+        os.makedirs(output_dir, exist_ok=True)
+        workers = num_workers if num_workers is not None else self.num_workers
+
         print(f"\n==========================================")
         print(f" Starting Evaluation Pipeline -> {output_dir}")
         print(f" Model: {model_name}")
         print(f" Datasets: Combined Multi-Domain ({TOTAL_CLASSES} Unified Semantic Classes)")
-        print(f" Target Resolution: {self.target_size[0]}x{self.target_size[1]}")
+        print(f" Hardware: {self.device} | Target: {self.target_size[0]}x{self.target_size[1]} | Workers: {workers}")
         print(f"==========================================")
 
-        # Support passing either a class type or an instantiated model
-        if isinstance(model_instance, type):
-            model = model_instance(num_classes=TOTAL_CLASSES)
+        # 1. Dataset loading handled directly by eval
+        if train_dataset is None:
+            print(f"[Evaluator] Loading training dataset from '{self.data_dir}' (Target: {self.target_size})...")
+            train_dataset = get_train_dataset(root_dir=self.data_dir, target_size=self.target_size)
+        if test_dataset is None:
+            print(f"[Evaluator] Loading test dataset from '{self.data_dir}' (Target: {self.target_size})...")
+            test_dataset = get_test_dataset(root_dir=self.data_dir, target_size=self.target_size)
+        print(f"[Evaluator] Datasets ready: {len(train_dataset):,} train, {len(test_dataset):,} test samples.")
+
+        # 2. Model preparation (agnostic: accepts class or instance)
+        if isinstance(model_cls_or_instance, type):
+            model = model_cls_or_instance(num_classes=TOTAL_CLASSES)
         else:
-            model = model_instance
+            model = model_cls_or_instance
+
+        # 3. Checkpoint resolution & loading
+        if weights_path is None:
+            candidates = [
+                os.path.join(output_dir, f"{model_name}_model.pth"),
+                os.path.join(output_dir, 'model.pth'),
+                os.path.join('models', model_name, f"{model_name}_model.pth"),
+            ]
+            weights_path = next((c for c in candidates if os.path.exists(c)), candidates[0])
 
         weights_loaded = False
         if load_if_exists and weights_path and os.path.exists(weights_path) and hasattr(model, 'load_weights'):
             weights_loaded = model.load_weights(weights_path)
 
+        # 4. Training if no weights loaded
         if not weights_loaded:
-            print(f"[Evaluator] Training {model_name} on training dataset ({len(train_dataset):,} samples)...")
+            print(f"[Evaluator] Training {model_name} on training dataset...")
             model.train(
                 dataset_or_mode=train_dataset,
                 epochs=epochs,
@@ -269,6 +301,14 @@ class Evaluator:
                 save_dir=output_dir
             )
 
+        # 5. Generic pre-test adaptation hook (auto-detected if model defines adapt_bn or adapt)
+        if pre_test_hook is None:
+            if hasattr(model, 'adapt_bn'):
+                pre_test_hook = lambda m, loader: m.adapt_bn(loader, device=self.device, verbose=False)
+            elif hasattr(model, 'adapt'):
+                pre_test_hook = lambda m, loader: m.adapt(loader, device=self.device)
+
+        # 6. Clean evaluation
         clean_results = self.test_without_noise(
             model_instance=model,
             test_dataset=test_dataset,
@@ -276,12 +316,13 @@ class Evaluator:
             batch_size=batch_size
         )
 
+        # 7. Robustness corrupted benchmark
         robustness_results = self.test_with_noise(
             model_instance=model,
             test_dataset=test_dataset,
             output_dir=output_dir,
-            batch_size=batch_size,
-            num_workers=num_workers,
+            batch_size=batch_size * 2,
+            num_workers=workers,
             pre_test_hook=pre_test_hook
         )
 
