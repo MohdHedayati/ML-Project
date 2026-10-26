@@ -99,12 +99,12 @@ def add_noise_and_scale(image, noise_type: str, severity: int = 1, target_size: 
 class CorruptedGTSRBDataset(Dataset):
     """
     Dataset wrapper that dynamically injects noise corruption and downscales images.
-    Works seamlessly with PyTorch DataLoader multiprocessing.
+    Works seamlessly with GTSRB, BTSD, and CTSD datasets.
     """
     def __init__(self, base_dataset_or_csv, root_dir='data', noise_type='fog', severity=1, target_size=(49, 49), transform=None):
         """
         Args:
-            base_dataset_or_csv: A GTSRBDataset instance OR path to a CSV annotations file.
+            base_dataset_or_csv: A Dataset instance (GTSRB, BTSD, CTSD) OR path to a CSV annotations file.
             root_dir: Data directory if CSV path is provided.
             noise_type: Noise corruption name from NOISE_TYPES.
             severity: Severity level (1 to 5).
@@ -115,23 +115,34 @@ class CorruptedGTSRBDataset(Dataset):
         self.severity = severity
         self.target_size = target_size
         self.transform = transform if transform is not None else transforms.ToTensor()
+        self.base_dataset = base_dataset_or_csv if isinstance(base_dataset_or_csv, Dataset) else None
 
-        if hasattr(base_dataset_or_csv, 'annotations'):
+        if self.base_dataset is not None and hasattr(self.base_dataset, 'get_pil_image'):
+            self.length = len(self.base_dataset)
+        elif hasattr(base_dataset_or_csv, 'annotations'):
             self.annotations = base_dataset_or_csv.annotations
             self.root_dir = getattr(base_dataset_or_csv, 'root_dir', root_dir)
+            self.paths = [os.path.join(self.root_dir, p) for p in self.annotations['Path']]
+            self.labels = self.annotations['ClassId'].astype(int).tolist()
+            self.length = len(self.paths)
         elif isinstance(base_dataset_or_csv, str):
             import pandas as pd
-            self.annotations = pd.read_csv(base_dataset_or_csv)
-            self.root_dir = root_dir
+            df = pd.read_csv(base_dataset_or_csv)
+            self.paths = [os.path.join(root_dir, p) for p in df['Path']]
+            self.labels = df['ClassId'].astype(int).tolist()
+            self.length = len(self.paths)
         else:
-            raise TypeError("base_dataset_or_csv must be a GTSRBDataset or path to CSV file.")
+            raise TypeError("base_dataset_or_csv must be a Dataset instance or path to CSV file.")
 
     def __len__(self):
-        return len(self.annotations)
+        return self.length
 
     def __getitem__(self, index):
-        img_path = os.path.join(self.root_dir, self.annotations.iloc[index]['Path'])
-        image = Image.open(img_path).convert('RGB')
+        if self.base_dataset is not None and hasattr(self.base_dataset, 'get_pil_image'):
+            image, y_label = self.base_dataset.get_pil_image(index)
+        else:
+            image = Image.open(self.paths[index]).convert('RGB')
+            y_label = self.labels[index]
         
         # Apply noise first, then downscale to target_size
         noisy_scaled_pil = add_noise_and_scale(
@@ -142,5 +153,33 @@ class CorruptedGTSRBDataset(Dataset):
         )
         
         image_tensor = self.transform(noisy_scaled_pil)
-        y_label = int(self.annotations.iloc[index]['ClassId'])
         return image_tensor, y_label
+
+
+    def get_metadata(self, index):
+        """Returns full sample metadata including corruption type and severity."""
+        if self.base_dataset is not None and hasattr(self.base_dataset, 'get_metadata'):
+            meta = self.base_dataset.get_metadata(index).copy()
+        elif hasattr(self, 'paths'):
+            meta = {
+                'path': self.paths[index],
+                'unified_label': self.labels[index],
+                'dataset': 'unknown',
+                'original_label': self.labels[index],
+                'country': 'unknown'
+            }
+        else:
+            meta = {}
+        meta['corruption_type'] = self.noise_type
+        meta['severity'] = self.severity
+        return meta
+
+    def get_sample_info(self, index):
+        """Returns (image_tensor, metadata_dict) for inspection."""
+        tensor, _ = self[index]
+        return tensor, self.get_metadata(index)
+
+
+# Backward-compatible alias and universal name
+CorruptedDataset = CorruptedGTSRBDataset
+

@@ -1,0 +1,72 @@
+
+Structure of the annotation files sequence?_GT.txt
+
+Example file:
+
+sequence1_GT.txt 
+
+
+97				# number of poles
+1 327				# pole number and an ID
+147989.236 202129.906 6.186	# the 3D coordinates of the poles
+2;E1;begin;			# number of traffic signs on the pole, and the types
+3				# number of centers used for getting the 3D position of the poles
+477.56 286.44 1 32024		# image coordinates, camera number, frame number of a such center
+502.42 206.59 1 32026
+528.97 115.86 1 32028
+6				# number of annotated bounding boxes for the traffic signs on this pole
+121.68 212.49 183.57 267.69	# one bounding box - 2D coordinates (upleft , downright)
+2 32617 1			# camera, frame, order number on the pole for this traffic sign
+E1;				# type of the traffic sign
+147989.236 202129.906 8.432	# 3D center coordinates for this annotated traffic sign
+148.9 1331.05 208.43 1391.37    # the 2nd bounding box annotation
+2 32635 1
+E1;
+147989.236 202129.906 8.421
+121.84 780.52 181.25 836.98	# the 3rd bounding box annotation
+2 32626 1
+E1;
+147989.236 202129.906 8.413
+184.75 241.17 220.9 253.35	# the 4th bounding box annotation
+2 32617 2
+begin;
+147989.236 202129.906 7.856
+209.61 1350.3 243.59 1361.11	# the 5th bounding box annotation
+2 32635 2
+begin;
+147989.236 202129.906 7.856
+181.41 804.74 216.44 814.89	# the 6th bounding box annotation
+2 32626 2
+begin;
+147989.236 202129.906 7.855
+
+2 328				# the 2nd pole and its ID
+147973.144 202115.16 6.333	# etc..
+4;C3;C29;B19;C21;
+3
+424.1 1296.88 1 32060
+437.14 1413.71 1 32062
+460.86 1556.39 1 32064
+12
+1.13 1270.33 68.56 1339.16
+1 32060 1
+C3;
+147973.144 202115.16 10.204
+69.97 696.26 126.55 738.3
+1 32617 1
+C3;
+
+# etc ...
+
+
+Structure of the camera poses files 0000000000_*.poses
+
+200				# version file 
+1				# ignore	
+8 35638				# frames in the interval [8..35638]
+35631				# number of frames with computed poses
+8 0.55587207639642355339 0.82918000687817317029 -0.058879120885432331689 -0.83124039010743278055 0.55503330952950302724 -0.031264023521771135139 0.0067563700884076365039 0.066321501085543022036 0.99777543062404028262 149682.91527399927145 202425.47547365856008 11.61960718098895029 		# frame number followed by 3x3 (row-wise) relative rotation and 3 (x,y,z) relative translation
+9 0.55587893395662324458 0.82917611457100082184 -0.058869192352084306896 -0.83123584467919697794 0.55504011762220817339 -0.031264010465506184011 0.0067513927237297481632 0.066313187639141207841 0.99777601687023231847 149682.91533588193124 202425.47554238789598 11.619563821941548909 		# frame number followed by 3x3 (row-wise) relative rotation and 3 (x,y,z) relative translation
+10 0.55588196916215970589 0.82917413843299003773 -0.058868365989797749593 -0.83123380432412496965 0.55504327616486137664 -0.031262183753218111826 0.006752696442341003108 0.066311460081092662988 0.99777612286157246757 149682.91528367807041 202425.47559037536848 11.619567667982837023 		# frame number followed by 3x3 (row-wise) relative rotation matrix and 3 (x,y,z) relative translation
+
+# etc ...

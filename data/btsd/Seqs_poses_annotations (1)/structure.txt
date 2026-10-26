@@ -1,0 +1,82 @@
+- NonTSImages			//set of images without traffic signs
+  + TestingBG			//set of images without traffic signs used for testing
+  + TrainingBG			//set of images without traffic signs used for training
+  TestingBG_files.txt		//the list of images for testing
+  TrainingBG_files.txt		//the list of images for training   
+
+- Annotations			//set annotations
+  - images			//images with annotations, are split for each of the 8 cameras
+    + 00
+    + 01
+    + 02
+    + 03
+    + 04
+    + 05
+    + 06
+    + 07
+    sequences1_4_GT.txt		//pole annotations corresponding to Seq0x but here relative to /images/
+    testing_2D_GT.txt		//pole annotations for 2D single-view detection evaluation (contains sequences1_4_GT.txt along with testing_comparison_GT.txt)
+    testing_comparison_GT.txt	//pole annotations for 2D single-view detection evaluation
+    training_GT.txt		//pole annotations for training purposes (training, validation, setting of parameters)
+
+- DefinedTS			//traffic signs with an official name and pattern
+  + img				//depictions for each traffic sign class pattern
+  list_defined_TS.txt		//the 210 traffic signs list
+
+- Seq01				//sequence1_GT.txt corresponding material, used for 3D mapping evaluation(localisation+recognition)
+    + 00
+    + 01
+    + 02
+    + 03
+    + 04
+    + 05
+    + 06
+    + 07
+    0000000008_0000035638.poses	//poses for each camera at each frame
+    camera_set.txt		//camera calibration, internal parameters
+
+- Seq02				//sequence2_GT.txt corresponding material, used for 3D mapping
+    + 00
+    + 01
+    + 02
+    + 03
+    + 04
+    + 05
+    + 06
+    + 07
+    0000000000_0000022500.poses	//poses for each camera at each frame
+    camera_set.txt
+
+- Seq03				//sequence3_GT.txt corresponding material, used for 3D mapping
+    + 00
+    + 01
+    + 02
+    + 03
+    + 04
+    + 05
+    + 06
+    + 07
+    0000000000_0000032939.poses	//poses for each camera at each frame
+    camera_set.txt		//camera calibration, internal parameters
+
+- Seq04				//sequence4_GT.txt corresponding material, used for 3D mapping
+    + 00
+    + 01
+    + 02
+    + 03
+    + 04
+    + 05
+    + 06
+    + 07
+    0000000000_0000042386.poses	//poses for each camera at each frame
+    camera_set.txt		//camera calibration, internal parameters
+
+sequence1_GT.txt		//pole annotations corresponding Seq01 material used for 3D mapping evaluation
+sequence2_GT.txt		//pole annotations corresponding Seq02 material used for 3D mapping evaluation
+sequence3_GT.txt		//pole annotations corresponding Seq03 material used for 3D mapping evaluation
+sequence4_GT.txt		//pole annotations corresponding Seq04 material used for 3D mapping evaluation
+
+reducedSetTS.txt		//reduced set of traffic sign types used in our experiments - 62 traffic sign types
+structure.txt
+readme.txt
+
