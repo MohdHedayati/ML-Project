@@ -1,8 +1,8 @@
 """
-Interactive Command-Line Interface (CLI) for GTSRB Model Evaluation.
+Interactive Command-Line Interface (CLI) for Traffic Sign Model Evaluation.
 
 Dynamically scans the models/ directory, presents an interactive menu,
-and orchestrates training and robustness benchmarking via eval.py.
+resolves model configuration, and explicitly specifies all evaluation parameters to eval.py.
 """
 
 import os
@@ -11,6 +11,7 @@ import importlib
 import inspect
 import torch
 
+from dataset_loader import get_train_dataset, get_test_dataset, TOTAL_CLASSES
 from eval import Evaluator
 
 
@@ -66,11 +67,27 @@ def load_model_class(model_name, models_dir='models'):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Evaluate GTSRB Models (Clean + Robustness Benchmark)")
-    parser.add_argument('--workers', type=int, default=None,
-                        help="Number of DataLoader worker processes for parallel noise generation (default: auto).")
+    parser = argparse.ArgumentParser(description="Evaluate Traffic Sign Recognition Models (Clean + Robustness Benchmark)")
+    parser.add_argument('--model', type=str, default=None,
+                        help="Model name to evaluate (optional; if omitted, an interactive prompt is shown).")
+    parser.add_argument('--data-dir', type=str, default='data',
+                        help="Root directory for dataset files (default: 'data').")
+    parser.add_argument('--target-size', type=int, default=49,
+                        help="Square image resolution for preprocessing (default: 49).")
+    parser.add_argument('--batch-size', type=int, default=64,
+                        help="Batch size for training and inference (default: 64).")
+    parser.add_argument('--workers', type=int, default=4,
+                        help="Number of DataLoader worker processes for parallel noise generation (default: 4).")
     parser.add_argument('--epochs', type=int, default=5,
                         help="Training epochs if model weights do not already exist (default: 5).")
+    parser.add_argument('--device', type=str, default=None,
+                        help="Computation device ('cuda' or 'cpu'). Auto-detected if omitted.")
+    parser.add_argument('--output-dir', type=str, default=None,
+                        help="Custom output directory. Defaults to 'output/<model_name>'.")
+    parser.add_argument('--weights', type=str, default=None,
+                        help="Explicit checkpoint file path to load.")
+    parser.add_argument('--no-adapt', action='store_true',
+                        help="Disable model test-time adaptation hook if the model provides one.")
     args = parser.parse_args()
 
     # Discover models dynamically from the directory structure
@@ -79,47 +96,109 @@ def main():
         print("[Error] No models found in 'models/' directory. Expected layout: models/<model_name>/model.py")
         exit(1)
 
-    print("\n" + "="*50)
-    print(" GTSRB Model Evaluation Pipeline")
-    print("="*50)
-    print(" Discovered models in 'models/' directory:")
-    
-    # Sort with 'baseline' first if present, followed by others alphabetically
+    # Resolve model selection: from --model flag or interactive prompt
     sorted_model_names = sorted(available_models.keys(), key=lambda x: (x != 'baseline', x))
-    for idx, model_name in enumerate(sorted_model_names, 1):
-        print(f"   [{idx}] {model_name}")
-    print("="*50)
-
     default_model = 'baseline' if 'baseline' in sorted_model_names else sorted_model_names[0]
 
-    try:
-        user_choice = input(f"Enter model to evaluate (number or name) [default: {default_model}]: ").strip().lower()
-    except EOFError:
-        user_choice = default_model
-        print(default_model)
-
-    # Resolve selection from user input
-    selected_name = default_model
-    if user_choice:
-        if user_choice.isdigit() and 1 <= int(user_choice) <= len(sorted_model_names):
-            selected_name = sorted_model_names[int(user_choice) - 1]
-        elif user_choice in sorted_model_names:
-            selected_name = user_choice
+    selected_name = None
+    if args.model:
+        m_lower = args.model.strip().lower()
+        matched = [m for m in sorted_model_names if m.lower() == m_lower]
+        if matched:
+            selected_name = matched[0]
         else:
-            matched = [m for m in sorted_model_names if m.lower() == user_choice]
-            if matched:
-                selected_name = matched[0]
+            print(f"[Warning] Model '{args.model}' not found in 'models/'. Discovered: {sorted_model_names}")
+    
+    if selected_name is None:
+        print("\n" + "="*50)
+        print(" Traffic Sign Recognition Model Evaluation")
+        print("="*50)
+        print(" Discovered models in 'models/' directory:")
+        for idx, model_name in enumerate(sorted_model_names, 1):
+            print(f"   [{idx}] {model_name}")
+        print("="*50)
+
+        try:
+            user_choice = input(f"Enter model to evaluate (number or name) [default: {default_model}]: ").strip().lower()
+        except EOFError:
+            user_choice = default_model
+            print(default_model)
+
+        selected_name = default_model
+        if user_choice:
+            if user_choice.isdigit() and 1 <= int(user_choice) <= len(sorted_model_names):
+                selected_name = sorted_model_names[int(user_choice) - 1]
+            elif user_choice in sorted_model_names:
+                selected_name = user_choice
             else:
-                print(f"[Warning] Unknown model '{user_choice}'. Falling back to default: '{default_model}'.")
-                selected_name = default_model
+                matched = [m for m in sorted_model_names if m.lower() == user_choice]
+                if matched:
+                    selected_name = matched[0]
+                else:
+                    print(f"[Warning] Unknown model '{user_choice}'. Falling back to default: '{default_model}'.")
+                    selected_name = default_model
 
     # Dynamically load the selected class from its folder
     selected_model_cls = load_model_class(selected_name, 'models')
     print(f"\n--> Loaded class '{selected_model_cls.__name__}' dynamically from models/{selected_name}/model.py")
-    print(f"--> Running evaluation for: {selected_name.upper()}\n")
+    print(f"--> Selected model: {selected_name.upper()}\n")
 
-    evaluator = Evaluator(num_workers=args.workers)
-    evaluator.eval_model(selected_model_cls, model_name=selected_name, epochs=args.epochs)
+    # Explicitly resolve all settings
+    target_size = (args.target_size, args.target_size)
+    device = args.device if args.device else ("cuda" if torch.cuda.is_available() else "cpu")
+    num_workers = args.workers if args.workers is not None else 0
+    output_dir = args.output_dir if args.output_dir else os.path.join('output', selected_name)
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Explicitly resolve checkpoint path
+    if args.weights:
+        weights_path = args.weights
+    else:
+        candidates = [
+            os.path.join(output_dir, f"{selected_name}_model.pth"),
+            os.path.join(output_dir, 'model.pth'),
+            os.path.join('models', selected_name, f"{selected_name}_model.pth"),
+        ]
+        weights_path = next((c for c in candidates if os.path.exists(c)), candidates[0])
+
+    # Explicitly load train and test datasets
+    print(f"[CLI] Loading train and test datasets from '{args.data_dir}' (Target: {target_size})...")
+    train_dataset = get_train_dataset(root_dir=args.data_dir, target_size=target_size)
+    test_dataset = get_test_dataset(root_dir=args.data_dir, target_size=target_size)
+
+    # Instantiate model instance
+    model_instance = selected_model_cls(num_classes=TOTAL_CLASSES)
+
+    # Configure optional pre-test hook (e.g. test-time adaptation) if model supports it
+    pre_test_hook = None
+    if not args.no_adapt:
+        if hasattr(model_instance, 'adapt_bn'):
+            pre_test_hook = lambda m, loader: m.adapt_bn(loader, device=torch.device(device), verbose=False)
+        elif hasattr(model_instance, 'adapt'):
+            pre_test_hook = lambda m, loader: m.adapt(loader, device=torch.device(device))
+
+    # Initialize evaluator with every required parameter explicitly specified (no defaults)
+    evaluator = Evaluator(
+        data_dir=args.data_dir,
+        target_size=target_size,
+        device=device,
+        num_workers=num_workers
+    )
+
+    # Execute full evaluation pipeline with all parameters explicitly specified
+    evaluator.eval_model(
+        model_instance=model_instance,
+        model_name=selected_name,
+        output_dir=output_dir,
+        train_dataset=train_dataset,
+        test_dataset=test_dataset,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        num_workers=num_workers,
+        weights_path=weights_path,
+        load_if_exists=True,
+        pre_test_hook=pre_test_hook
+    )
 
 
 if __name__ == "__main__":

@@ -1,21 +1,22 @@
 """
-Modular Evaluation Pipeline for Traffic Sign Recognition Models.
+Model-Agnostic Evaluation Pipeline for Traffic Sign Recognition.
 
-Evaluates Baseline and AdaBN models on the unified multi-dataset benchmark
-(GTSRB + BTSD + CTSD combined into one set with 109 unified semantic classes).
+Provides a completely generic evaluation engine for benchmarking neural network models
+under clean and corrupted conditions. Contains NO model-specific code or default assumptions;
+all configuration parameters, datasets, directories, devices, and hooks must be explicitly specified.
 
 Methods:
-- test_without_noise: evaluates clean test data, saves confusion matrix to output/<model_name>/test_without_noise.pdf
+- test_without_noise: evaluates clean test data, saves confusion matrix to <output_dir>/test_without_noise.pdf
 - test_with_noise: evaluates across 14 noise types x 5 severities,
-  saves 14 confusion matrices to output/<model_name>/noise/<noise>_severity_5.pdf,
-  saves robustness_degradation.pdf and robustness_results.csv to output/<model_name>/
-- eval_model: instantiates model_cls, trains on combined data, runs clean and robustness tests
+  saves 14 confusion matrices to <output_dir>/noise/<noise>_severity_5.pdf,
+  saves robustness_degradation.pdf and robustness_results.csv to <output_dir>/
+- eval_model: orchestrates full pipeline (checkpoint loading/training, clean eval, robustness benchmark)
 """
 
 import os
 import copy
-import argparse
 import numpy as np
+
 # NumPy 2.0+ compatibility shim for imagecorruptions
 if not hasattr(np, 'float_'):
     np.float_ = np.float64
@@ -29,32 +30,28 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, ConfusionMatrixDisplay
 from tqdm import tqdm
 
-from dataset_loader import get_train_dataset, get_test_dataset, TOTAL_CLASSES, UNIFIED_CLASS_NAMES
+from dataset_loader import TOTAL_CLASSES
 from noise import NOISE_TYPES, CorruptedGTSRBDataset
-from models.adabn.model import AdaBN
-from models.baseline.model import Baseline
 
 
 class Evaluator:
     """
-    Evaluator class for benchmarking traffic sign recognition models
+    Model-agnostic evaluator class for benchmarking traffic sign recognition models
     under clean and corrupted conditions.
+    
+    Contains NO default values or model-specific logic; all settings must be specified.
     """
-    def __init__(self, data_dir='data', target_size=(49, 49), device=None, num_workers=0):
+    def __init__(self, data_dir, target_size, device, num_workers):
         self.data_dir = data_dir
-        self.target_size = target_size
-        if device is None:
-            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        else:
-            self.device = torch.device(device)
-            
-        self.num_workers = num_workers if num_workers is not None else 0
-        print(f"[Evaluator] Initialized on device: {self.device} (Target: {self.target_size}, Workers: {self.num_workers})")
+        self.target_size = tuple(target_size)
+        self.device = torch.device(device)
+        self.num_workers = int(num_workers)
+        print(f"[Evaluator] Initialized on device: {self.device} (Target Size: {self.target_size}, Workers: {self.num_workers})")
 
-    def test_without_noise(self, model_instance, test_dataset, output_dir="output/adabn", batch_size=64):
+    def test_without_noise(self, model_instance, test_dataset, output_dir, batch_size):
         """
         Evaluates the model on clean data (without noise) scaled to target_size.
-        Generates and saves a confusion matrix to output_dir/test_without_noise.pdf.
+        Generates and saves a confusion matrix to <output_dir>/test_without_noise.pdf.
         """
         os.makedirs(output_dir, exist_ok=True)
         pdf_path = os.path.join(output_dir, 'test_without_noise.pdf')
@@ -74,7 +71,10 @@ class Evaluator:
         cm = confusion_matrix(all_labels, all_preds, labels=labels_range)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(ax=ax, cmap='Blues', colorbar=False, include_values=False)
-        plt.title(f"Confusion Matrix (Clean Data - {TOTAL_CLASSES} Unified Classes - {self.target_size[0]}x{self.target_size[1]})", fontsize=14)
+        plt.title(
+            f"Confusion Matrix (Clean Data - {TOTAL_CLASSES} Unified Classes - {self.target_size[0]}x{self.target_size[1]})",
+            fontsize=14
+        )
         plt.tight_layout()
         plt.savefig(pdf_path, format="pdf")
         plt.close(fig)
@@ -88,14 +88,19 @@ class Evaluator:
             'pdf_path': pdf_path
         }
 
-    def test_with_noise(self, model_instance, test_dataset, output_dir="output/adabn", batch_size=128, num_workers=0, use_adabn=True):
+    def test_with_noise(self, model_instance, test_dataset, output_dir, batch_size, num_workers, pre_test_hook):
         """
         Evaluates the model across 14 noise types at 5 severity levels (70 experiments).
-        If use_adabn is True, adapts BatchNorm layers before testing each corruption.
+        
+        Args:
+            model_instance: Initialized model instance complying with the model interface contract.
+            test_dataset: PyTorch Dataset of test samples.
+            output_dir: Destination directory for artifacts and matrices.
+            batch_size: Mini-batch size for DataLoader.
+            num_workers: Multiprocessing worker count for parallel noise generation.
+            pre_test_hook: Optional callable hook `pre_test_hook(model_instance, corrupted_loader)`
+                           invoked before evaluating each corruption (e.g. for test-time adaptation).
         """
-        if num_workers is None:
-            num_workers = self.num_workers
-
         noise_dir = os.path.join(output_dir, 'noise')
         os.makedirs(noise_dir, exist_ok=True)
 
@@ -109,8 +114,8 @@ class Evaluator:
         if num_workers > 0:
             loader_kwargs['prefetch_factor'] = 2
 
-        adabn_str = " [WITH AdaBN TEST-TIME ADAPTATION]" if use_adabn else " [WITHOUT ADAPTATION]"
-        print(f"\n[Evaluator] Running robustness benchmark{adabn_str} across {len(NOISE_TYPES)} corruptions x 5 severities...")
+        hook_status = f" [Pre-Test Hook: {pre_test_hook.__name__ if hasattr(pre_test_hook, '__name__') else 'Active'}]" if pre_test_hook else ""
+        print(f"\n[Evaluator] Running robustness benchmark{hook_status} across {len(NOISE_TYPES)} corruptions x 5 severities...")
         print(f"[Evaluator] Output directory: '{output_dir}'")
 
         source_state = copy.deepcopy(model_instance.state_dict())
@@ -130,10 +135,9 @@ class Evaluator:
 
                 corrupted_loader = DataLoader(corrupted_ds, **loader_kwargs)
 
-                if use_adabn:
+                if pre_test_hook is not None:
                     model_instance.load_state_dict(copy.deepcopy(source_state))
-                    if hasattr(model_instance, 'adapt_bn'):
-                        model_instance.adapt_bn(corrupted_loader, device=self.device, verbose=False)
+                    pre_test_hook(model_instance, corrupted_loader)
 
                 preds, labels = model_instance.test(corrupted_loader, device=self.device)
                 acc = accuracy_score(labels, preds) * 100
@@ -160,7 +164,7 @@ class Evaluator:
 
         progress_bar.close()
 
-        # Restore clean state
+        # Restore original uncorrupted weights
         model_instance.load_state_dict(source_state)
 
         results.sort(key=lambda x: (NOISE_TYPES.index(x['Noise_Type']), x['Severity']))
@@ -217,41 +221,47 @@ class Evaluator:
         plt.close()
         print(f"[Evaluator] Robustness degradation plot saved to: '{output_path}'")
 
-    def eval_model(self, model_cls=AdaBN, output_dir='output/adabn', epochs=5, batch_size=64, num_workers=0, load_if_exists=True, use_adabn=True):
+    def eval_model(
+        self,
+        model_instance,
+        model_name,
+        output_dir,
+        train_dataset,
+        test_dataset,
+        epochs,
+        batch_size,
+        num_workers,
+        weights_path,
+        load_if_exists,
+        pre_test_hook
+    ):
         """
         Main orchestration method:
-        1. Loads combined train and test datasets (all 3 datasets in one set, 163 classes).
-        2. Instantiates model class (AdaBN or Baseline).
-        3. Trains model or loads checkpoint.
-        4. Runs test_without_noise.
-        5. Runs test_with_noise.
+        1. Prepares model instance.
+        2. Loads existing checkpoint from weights_path or trains on train_dataset.
+        3. Runs clean evaluation (test_without_noise).
+        4. Runs corrupted robustness benchmark (test_with_noise).
         """
         print(f"\n==========================================")
         print(f" Starting Evaluation Pipeline -> {output_dir}")
-        print(f" Datasets: GTSRB + BTSD + CTSD combined ({TOTAL_CLASSES} unified semantic classes)")
-        print(f" Mode: {'AdaBN Test-Time Adaptation' if use_adabn else 'Standard Baseline'}")
+        print(f" Model: {model_name}")
+        print(f" Datasets: Combined Multi-Domain ({TOTAL_CLASSES} Unified Semantic Classes)")
+        print(f" Target Resolution: {self.target_size[0]}x{self.target_size[1]}")
         print(f"==========================================")
 
-        train_dataset = get_train_dataset(root_dir=self.data_dir, target_size=self.target_size)
-        test_dataset = get_test_dataset(root_dir=self.data_dir, target_size=self.target_size)
-        print(f"[Evaluator] Loaded Combined Train ({len(train_dataset):,} samples) and Test ({len(test_dataset):,} samples)")
-
-        model_instance = model_cls(num_classes=TOTAL_CLASSES)
-        checkpoint_candidates = [
-            os.path.join(output_dir, 'adabn_model.pth'),
-            os.path.join(output_dir, 'baseline_model.pth'),
-            os.path.join(output_dir, 'model.pth'),
-            os.path.join('models', 'adabn', 'adabn_model.pth'),
-        ]
-        checkpoint_path = next((c for c in checkpoint_candidates if os.path.exists(c)), checkpoint_candidates[0])
+        # Support passing either a class type or an instantiated model
+        if isinstance(model_instance, type):
+            model = model_instance(num_classes=TOTAL_CLASSES)
+        else:
+            model = model_instance
 
         weights_loaded = False
-        if load_if_exists and hasattr(model_instance, 'load_weights'):
-            weights_loaded = model_instance.load_weights(checkpoint_path)
+        if load_if_exists and weights_path and os.path.exists(weights_path) and hasattr(model, 'load_weights'):
+            weights_loaded = model.load_weights(weights_path)
 
         if not weights_loaded:
-            print(f"[Evaluator] Training model instance on combined dataset...")
-            model_instance.train(
+            print(f"[Evaluator] Training {model_name} on training dataset ({len(train_dataset):,} samples)...")
+            model.train(
                 dataset_or_mode=train_dataset,
                 epochs=epochs,
                 batch_size=batch_size,
@@ -260,21 +270,23 @@ class Evaluator:
             )
 
         clean_results = self.test_without_noise(
-            model_instance=model_instance,
+            model_instance=model,
             test_dataset=test_dataset,
-            output_dir=output_dir
+            output_dir=output_dir,
+            batch_size=batch_size
         )
 
         robustness_results = self.test_with_noise(
-            model_instance=model_instance,
+            model_instance=model,
             test_dataset=test_dataset,
             output_dir=output_dir,
+            batch_size=batch_size,
             num_workers=num_workers,
-            use_adabn=use_adabn
+            pre_test_hook=pre_test_hook
         )
 
         print(f"\n==========================================")
-        print(f" Finished Pipeline. Artifacts stored in: {output_dir}/")
+        print(f" Finished Pipeline for {model_name}. Artifacts stored in: '{output_dir}/'")
         print(f"==========================================\n")
 
         return {
@@ -282,7 +294,8 @@ class Evaluator:
             'clean_metrics': clean_results,
             'robustness_df': robustness_results
         }
+
+
 if __name__ == '__main__':
     from cli import main
     main()
-
