@@ -316,9 +316,3 @@ class Evaluator:
             'clean_metrics': clean_results,
             'robustness_df': robustness_results
         }
-
-
-if __name__ == "__main__":
-    from models.baseline.model import Baseline
-    evaluator = Evaluator()
-    evaluator.eval_model(Baseline, model_name="baseline")
