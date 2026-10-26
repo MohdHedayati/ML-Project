@@ -156,6 +156,30 @@ class CorruptedGTSRBDataset(Dataset):
         return image_tensor, y_label
 
 
+    def get_metadata(self, index):
+        """Returns full sample metadata including corruption type and severity."""
+        if self.base_dataset is not None and hasattr(self.base_dataset, 'get_metadata'):
+            meta = self.base_dataset.get_metadata(index).copy()
+        elif hasattr(self, 'paths'):
+            meta = {
+                'path': self.paths[index],
+                'unified_label': self.labels[index],
+                'dataset': 'unknown',
+                'original_label': self.labels[index],
+                'country': 'unknown'
+            }
+        else:
+            meta = {}
+        meta['corruption_type'] = self.noise_type
+        meta['severity'] = self.severity
+        return meta
+
+    def get_sample_info(self, index):
+        """Returns (image_tensor, metadata_dict) for inspection."""
+        tensor, _ = self[index]
+        return tensor, self.get_metadata(index)
+
+
 # Backward-compatible alias and universal name
 CorruptedDataset = CorruptedGTSRBDataset
 

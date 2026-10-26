@@ -1,0 +1,1235 @@
+{
+  "metadata": {
+    "version": "1.0",
+    "description": "Authoritative unified semantic traffic sign label mapping across GTSRB (Germany), BTSD (Belgium), and CTSD (China)",
+    "total_unified_classes": 109,
+    "datasets": {
+      "gtsrb": {
+        "dataset_name": "German Traffic Sign Recognition Benchmark",
+        "country": "Germany",
+        "original_classes": 43
+      },
+      "btsd": {
+        "dataset_name": "Belgium Traffic Sign Dataset",
+        "country": "Belgium",
+        "original_classes": 62
+      },
+      "ctsd": {
+        "dataset_name": "Chinese Traffic Sign Database",
+        "country": "China",
+        "original_classes": 58
+      }
+    }
+  },
+  "unified_classes": [
+    {
+      "unified_id": 0,
+      "name": "Stop",
+      "category": "Priority / Regulatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 14, "original_name": "Stop", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 21, "original_name": "B5 - Stop", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 52, "original_name": "Stop (停)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 1,
+      "name": "Yield / Give way",
+      "category": "Priority",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 13, "original_name": "Yield", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 19, "original_name": "B1 - Yield", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 56, "original_name": "Yield (让)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 2,
+      "name": "No entry",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 17, "original_name": "No entry", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 22, "original_name": "C1 - No entry", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 55, "original_name": "No entry", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 3,
+      "name": "No vehicles / Road closed",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 15, "original_name": "No vehicles", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 28, "original_name": "C3 - Closed in both directions", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 53, "original_name": "No vehicles", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 4,
+      "name": "Roundabout mandatory",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 40, "original_name": "Roundabout mandatory", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 36, "original_name": "D3b - Mandatory roundabout", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 27, "original_name": "Mandatory roundabout", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 5,
+      "name": "Keep right",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 38, "original_name": "Keep right", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 37, "original_name": "D5 - Mandatory keep right", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 26, "original_name": "Keep right", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 6,
+      "name": "Ahead only",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 35, "original_name": "Ahead only", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 34, "original_name": "D1a - Mandatory ahead only", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 21, "original_name": "Ahead only", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 7,
+      "name": "Turn right ahead",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 33, "original_name": "Turn right ahead", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 35, "original_name": "D1b - Mandatory turn right", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 24, "original_name": "Mandatory turn right", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 8,
+      "name": "Road work",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 25, "original_name": "Road work", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 10, "original_name": "A31 - Road works", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 48, "original_name": "Road work", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 9,
+      "name": "Traffic signals",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 26, "original_name": "Traffic signals", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 11, "original_name": "A33 - Traffic light signals", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 33, "original_name": "Traffic signals ahead", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 10,
+      "name": "Pedestrians crossing ahead",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 27, "original_name": "Pedestrians", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 7, "original_name": "A23 - Pedestrian crossing ahead", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 35, "original_name": "Pedestrians crossing", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 11,
+      "name": "Children crossing",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 28, "original_name": "Children crossing", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 8, "original_name": "A25 - Children crossing", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 37, "original_name": "Children crossing", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 12,
+      "name": "Bicycles crossing",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 29, "original_name": "Bicycles crossing", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 9, "original_name": "A29 - Cyclists crossing", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 36, "original_name": "Cyclists crossing", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 13,
+      "name": "General caution / Danger",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 18, "original_name": "General caution", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 13, "original_name": "A51 - General danger", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 34, "original_name": "General danger / Caution", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 14,
+      "name": "Dangerous curve to the left",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 19, "original_name": "Dangerous curve to the left", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 4, "original_name": "A1B - Dangerous bend to left", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 39, "original_name": "Dangerous curve to the left", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 15,
+      "name": "No passing",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 9, "original_name": "No passing", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 24, "original_name": "C21 - No passing", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 14, "original_name": "No passing", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 16,
+      "name": "Priority road",
+      "category": "Priority",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 12, "original_name": "Priority road", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 61, "original_name": "B9 - Priority road", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 17,
+      "name": "Right-of-way at next intersection",
+      "category": "Priority / Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 11, "original_name": "Right-of-way at next intersection", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 17, "original_name": "B15A - Priority over side road", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 18,
+      "name": "Dangerous curve to the right",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 20, "original_name": "Dangerous curve to the right", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 3, "original_name": "A1A - Dangerous bend to right", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 19,
+      "name": "Double curve (first to right)",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 21, "original_name": "Double curve", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 5, "original_name": "A1C - Double bend, first right", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 20,
+      "name": "Bumpy road",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 22, "original_name": "Bumpy road", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 0, "original_name": "A13 - Bumpy road", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 21,
+      "name": "Slippery road",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 23, "original_name": "Slippery road", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 2, "original_name": "A15 - Slippery road", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 22,
+      "name": "Road narrows on right",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 24, "original_name": "Road narrows on right", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 15, "original_name": "A7B - Road narrows right", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 23,
+      "name": "No passing for heavy vehicles",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 10, "original_name": "No passing for vehicles > 3.5t", "country": "Germany"},
+        {"dataset": "btsd", "original_id": 25, "original_name": "C23 - No passing for goods vehicles > 3.5t", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 24,
+      "name": "Speed limit (30km/h)",
+      "category": "Speed Limit",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 1, "original_name": "Speed limit (30km/h)", "country": "Germany"},
+        {"dataset": "ctsd", "original_id": 2, "original_name": "Speed limit (30km/h)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 25,
+      "name": "Speed limit (50km/h)",
+      "category": "Speed Limit",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 2, "original_name": "Speed limit (50km/h)", "country": "Germany"},
+        {"dataset": "ctsd", "original_id": 4, "original_name": "Speed limit (50km/h)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 26,
+      "name": "Speed limit (60km/h)",
+      "category": "Speed Limit",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 3, "original_name": "Speed limit (60km/h)", "country": "Germany"},
+        {"dataset": "ctsd", "original_id": 5, "original_name": "Speed limit (60km/h)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 27,
+      "name": "Speed limit (70km/h)",
+      "category": "Speed Limit",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 4, "original_name": "Speed limit (70km/h)", "country": "Germany"},
+        {"dataset": "ctsd", "original_id": 6, "original_name": "Speed limit (70km/h)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 28,
+      "name": "Speed limit (80km/h)",
+      "category": "Speed Limit",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 5, "original_name": "Speed limit (80km/h)", "country": "Germany"},
+        {"dataset": "ctsd", "original_id": 7, "original_name": "Speed limit (80km/h)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 29,
+      "name": "Turn left ahead",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 34, "original_name": "Turn left ahead", "country": "Germany"},
+        {"dataset": "ctsd", "original_id": 22, "original_name": "Mandatory turn left", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 30,
+      "name": "Go straight or right",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 36, "original_name": "Go straight or right", "country": "Germany"},
+        {"dataset": "ctsd", "original_id": 20, "original_name": "Mandatory straight or right", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 31,
+      "name": "Keep left",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 39, "original_name": "Keep left", "country": "Germany"},
+        {"dataset": "ctsd", "original_id": 25, "original_name": "Keep left", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 32,
+      "name": "No left turn",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 29, "original_name": "C31LEFT - No left turn", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 11, "original_name": "No left turn", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 33,
+      "name": "No right turn",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 30, "original_name": "C31RIGHT - No right turn", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 13, "original_name": "No right turn", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 34,
+      "name": "Double curve (first to left)",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 6, "original_name": "A1D - Double bend, first left", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 38, "original_name": "Double curve, first left", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 35,
+      "name": "Railway crossing without barrier",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 12, "original_name": "A41 - Level crossing without barrier", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 47, "original_name": "Railway crossing without barrier", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 36,
+      "name": "No stopping",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 41, "original_name": "E3 - No stopping", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 54, "original_name": "No stopping / standing", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 37,
+      "name": "Compulsory cycle track",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 38, "original_name": "D7 - Mandatory cycle track", "country": "Belgium"},
+        {"dataset": "ctsd", "original_id": 30, "original_name": "Bicycles only / cycle track", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 38,
+      "name": "Speed limit (20km/h)",
+      "category": "Speed Limit",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 0, "original_name": "Speed limit (20km/h)", "country": "Germany"}
+      ]
+    },
+    {
+      "unified_id": 39,
+      "name": "End of speed limit (80km/h)",
+      "category": "End of Restriction",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 6, "original_name": "End of speed limit (80km/h)", "country": "Germany"}
+      ]
+    },
+    {
+      "unified_id": 40,
+      "name": "Speed limit (100km/h)",
+      "category": "Speed Limit",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 7, "original_name": "Speed limit (100km/h)", "country": "Germany"}
+      ]
+    },
+    {
+      "unified_id": 41,
+      "name": "Speed limit (120km/h)",
+      "category": "Speed Limit",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 8, "original_name": "Speed limit (120km/h)", "country": "Germany"}
+      ]
+    },
+    {
+      "unified_id": 42,
+      "name": "Vehicles over 3.5t prohibited",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 16, "original_name": "Vehicles over 3.5 metric tons prohibited", "country": "Germany"}
+      ]
+    },
+    {
+      "unified_id": 43,
+      "name": "Beware of ice/snow",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 30, "original_name": "Beware of ice/snow", "country": "Germany"}
+      ]
+    },
+    {
+      "unified_id": 44,
+      "name": "Wild animals crossing",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 31, "original_name": "Wild animals crossing", "country": "Germany"}
+      ]
+    },
+    {
+      "unified_id": 45,
+      "name": "End of all speed and passing limits",
+      "category": "End of Restriction",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 32, "original_name": "End of all speed and passing limits", "country": "Germany"}
+      ]
+    },
+    {
+      "unified_id": 46,
+      "name": "Go straight or left",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 37, "original_name": "Go straight or left", "country": "Germany"}
+      ]
+    },
+    {
+      "unified_id": 47,
+      "name": "End of no passing",
+      "category": "End of Restriction",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 41, "original_name": "End of no passing", "country": "Germany"}
+      ]
+    },
+    {
+      "unified_id": 48,
+      "name": "End of no passing for vehicles > 3.5t",
+      "category": "End of Restriction",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "gtsrb", "original_id": 42, "original_name": "End of no passing for vehicles > 3.5t", "country": "Germany"}
+      ]
+    },
+    {
+      "unified_id": 49,
+      "name": "Speed bump",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 1, "original_name": "A14 - Speed bump", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 50,
+      "name": "Road narrows on both sides",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 14, "original_name": "A7A - Road narrows both sides", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 51,
+      "name": "Road narrows on left",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 16, "original_name": "A7C - Road narrows left", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 52,
+      "name": "Priority over oncoming vehicles",
+      "category": "Priority",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 18, "original_name": "B17 - Priority over oncoming", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 53,
+      "name": "Give priority to oncoming traffic",
+      "category": "Priority",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 20, "original_name": "B19 - Oncoming traffic priority", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 54,
+      "name": "Vehicles carrying dangerous goods prohibited",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 23, "original_name": "C11 - No dangerous goods", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 55,
+      "name": "Weight limit",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 26, "original_name": "C27 - Weight limit", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 56,
+      "name": "Axle load limit",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 27, "original_name": "C29 - Axle load limit", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 57,
+      "name": "Minimum distance between vehicles",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 31, "original_name": "C35 - Minimum distance", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 58,
+      "name": "Speed limit signs (Belgian C43 compound)",
+      "category": "Speed Limit",
+      "needs_manual_review": true,
+      "review_note": "BTSD groups various speed limit values into code C43 rather than distinct speed classes; retained as distinct class to avoid corrupting specific speed classes.",
+      "sources": [
+        {"dataset": "btsd", "original_id": 32, "original_name": "C43 - Speed limit signs", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 59,
+      "name": "Shared pedestrian and cycle path",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 33, "original_name": "D10 - Shared pedestrian/cycle path", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 60,
+      "name": "Mandatory pedestrian footpath",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 39, "original_name": "D9 - Compulsory footpath", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 61,
+      "name": "No parking",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 40, "original_name": "E1 - No parking", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 62,
+      "name": "Parking zone",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 42, "original_name": "E5 - Parking zone", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 63,
+      "name": "Alternate parking zone",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 43, "original_name": "E7 - Alternate parking", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 64,
+      "name": "Priority road section",
+      "category": "Priority",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 44, "original_name": "B21 - Priority road section", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 65,
+      "name": "Parking area",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 45, "original_name": "E9a - Parking area", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 66,
+      "name": "Parking for disabled persons",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 46, "original_name": "E9a_miva - Disabled parking", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 73,
+      "name": "One-way street",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 53, "original_name": "F19 - One-way street", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 67,
+      "name": "Parking on pavement",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 47, "original_name": "E9b - Parking on pavement", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 68,
+      "name": "Parking partly on pavement",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 48, "original_name": "E9c - Parking partly on pavement", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 69,
+      "name": "Parking on roadway",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 49, "original_name": "E9d - Parking on roadway", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 70,
+      "name": "Camper parking",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 50, "original_name": "E9e - Motorhome parking", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 71,
+      "name": "Residential area begin",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 51, "original_name": "F12a - Residential zone begin", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 72,
+      "name": "Residential area end",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 52, "original_name": "F12b - Residential zone end", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 74,
+      "name": "Dead end / Cul-de-sac",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 54, "original_name": "F45 - Dead end", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 75,
+      "name": "Motorway begin",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 55, "original_name": "F47 - Motorway begin", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 76,
+      "name": "Motorway end",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 56, "original_name": "F49 - Motorway end", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 77,
+      "name": "Expressway begin",
+      "category": "Indication",
+      "needs_manual_review": true,
+      "review_note": "Belgian F50 is an indicative blue expressway sign; kept separate from circular mandatory signs.",
+      "sources": [
+        {"dataset": "btsd", "original_id": 57, "original_name": "F50 - Expressway begin", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 78,
+      "name": "Pedestrian crossing (indicative sign)",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 58, "original_name": "F59 - Pedestrian crossing", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 79,
+      "name": "Information sign",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 59, "original_name": "F87 - Information sign", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 80,
+      "name": "End of priority road",
+      "category": "Priority",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "btsd", "original_id": 60, "original_name": "B11 - End of priority road", "country": "Belgium"}
+      ]
+    },
+    {
+      "unified_id": 81,
+      "name": "Speed limit (5km/h)",
+      "category": "Speed Limit",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 0, "original_name": "Speed limit (5km/h)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 82,
+      "name": "Speed limit (15km/h)",
+      "category": "Speed Limit",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 1, "original_name": "Speed limit (15km/h)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 83,
+      "name": "Speed limit (40km/h)",
+      "category": "Speed Limit",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 3, "original_name": "Speed limit (40km/h)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 84,
+      "name": "No straight or left turn",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 8, "original_name": "No straight or left turn", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 85,
+      "name": "No straight or right turn",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 9, "original_name": "No straight or right turn", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 86,
+      "name": "No straight",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 10, "original_name": "No straight", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 87,
+      "name": "No turning left or right",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 12, "original_name": "No left and right turn", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 88,
+      "name": "No U-turn",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 15, "original_name": "No U-turn", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 89,
+      "name": "Motor vehicles prohibited",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 16, "original_name": "Motor vehicles prohibited", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 90,
+      "name": "No honking",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 17, "original_name": "No honking / horn prohibited", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 91,
+      "name": "End of speed limit (40km/h)",
+      "category": "End of Restriction",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 18, "original_name": "End of speed limit (40km/h)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 92,
+      "name": "End of speed limit (50km/h)",
+      "category": "End of Restriction",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 19, "original_name": "End of speed limit (50km/h)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 93,
+      "name": "Mandatory turn left or right",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 23, "original_name": "Mandatory turn left or right", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 94,
+      "name": "Motor vehicles only (China circular mandatory)",
+      "category": "Mandatory",
+      "needs_manual_review": true,
+      "review_note": "Mandatory circular sign for motor vehicles; kept separate from general highway/expressway signs.",
+      "sources": [
+        {"dataset": "ctsd", "original_id": 28, "original_name": "Motor vehicles only", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 95,
+      "name": "Sound horn",
+      "category": "Mandatory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 29, "original_name": "Sound horn", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 96,
+      "name": "U-turn permitted",
+      "category": "Indication",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 31, "original_name": "U-turn permitted", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 97,
+      "name": "Two-way traffic diversion",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 32, "original_name": "Two-way traffic diversion", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 98,
+      "name": "Steep hill downwards",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 40, "original_name": "Steep hill downwards", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 99,
+      "name": "Steep hill upwards",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 41, "original_name": "Steep hill upwards", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 100,
+      "name": "Slow down (慢)",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 42, "original_name": "Slow down (慢)", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 101,
+      "name": "Side road right",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 43, "original_name": "Side road right", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 102,
+      "name": "Side road left",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 44, "original_name": "Side road left", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 103,
+      "name": "Village / Residential area ahead",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 45, "original_name": "Village ahead", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 104,
+      "name": "Winding road / Continuous curves",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 46, "original_name": "Winding road", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 105,
+      "name": "Crosswind",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 49, "original_name": "Crosswind", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 106,
+      "name": "Railway crossing with barrier",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 50, "original_name": "Railway crossing with barrier", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 107,
+      "name": "Accident prone section",
+      "category": "Warning",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 51, "original_name": "Accident prone section", "country": "China"}
+      ]
+    },
+    {
+      "unified_id": 108,
+      "name": "Stop for inspection (检查)",
+      "category": "Prohibitory",
+      "needs_manual_review": false,
+      "sources": [
+        {"dataset": "ctsd", "original_id": 57, "original_name": "Stop for inspection (检查)", "country": "China"}
+      ]
+    }
+  ],
+  "mappings": {
+    "gtsrb": {
+      "0": 38,
+      "1": 24,
+      "2": 25,
+      "3": 26,
+      "4": 27,
+      "5": 28,
+      "6": 39,
+      "7": 40,
+      "8": 41,
+      "9": 15,
+      "10": 23,
+      "11": 17,
+      "12": 16,
+      "13": 1,
+      "14": 0,
+      "15": 3,
+      "16": 42,
+      "17": 2,
+      "18": 13,
+      "19": 14,
+      "20": 18,
+      "21": 19,
+      "22": 20,
+      "23": 21,
+      "24": 22,
+      "25": 8,
+      "26": 9,
+      "27": 10,
+      "28": 11,
+      "29": 12,
+      "30": 43,
+      "31": 44,
+      "32": 45,
+      "33": 7,
+      "34": 29,
+      "35": 6,
+      "36": 30,
+      "37": 46,
+      "38": 5,
+      "39": 31,
+      "40": 4,
+      "41": 47,
+      "42": 48
+    },
+    "btsd": {
+      "0": 20,
+      "1": 49,
+      "2": 21,
+      "3": 18,
+      "4": 14,
+      "5": 19,
+      "6": 34,
+      "7": 10,
+      "8": 11,
+      "9": 12,
+      "10": 8,
+      "11": 9,
+      "12": 35,
+      "13": 13,
+      "14": 50,
+      "15": 22,
+      "16": 51,
+      "17": 17,
+      "18": 52,
+      "19": 1,
+      "20": 53,
+      "21": 0,
+      "22": 2,
+      "23": 54,
+      "24": 15,
+      "25": 23,
+      "26": 55,
+      "27": 56,
+      "28": 3,
+      "29": 32,
+      "30": 33,
+      "31": 57,
+      "32": 58,
+      "33": 59,
+      "34": 6,
+      "35": 7,
+      "36": 4,
+      "37": 5,
+      "38": 37,
+      "39": 60,
+      "40": 61,
+      "41": 36,
+      "42": 62,
+      "43": 63,
+      "44": 64,
+      "45": 65,
+      "46": 66,
+      "47": 67,
+      "48": 68,
+      "49": 69,
+      "50": 70,
+      "51": 71,
+      "52": 72,
+      "53": 73,
+      "54": 74,
+      "55": 75,
+      "56": 76,
+      "57": 77,
+      "58": 78,
+      "59": 79,
+      "60": 80,
+      "61": 16
+    },
+    "ctsd": {
+      "0": 81,
+      "1": 82,
+      "2": 24,
+      "3": 83,
+      "4": 25,
+      "5": 26,
+      "6": 27,
+      "7": 28,
+      "8": 84,
+      "9": 85,
+      "10": 86,
+      "11": 32,
+      "12": 87,
+      "13": 33,
+      "14": 15,
+      "15": 88,
+      "16": 89,
+      "17": 90,
+      "18": 91,
+      "19": 92,
+      "20": 30,
+      "21": 6,
+      "22": 29,
+      "23": 93,
+      "24": 7,
+      "25": 31,
+      "26": 5,
+      "27": 4,
+      "28": 94,
+      "29": 95,
+      "30": 37,
+      "31": 96,
+      "32": 97,
+      "33": 9,
+      "34": 13,
+      "35": 10,
+      "36": 12,
+      "37": 11,
+      "38": 34,
+      "39": 14,
+      "40": 98,
+      "41": 99,
+      "42": 100,
+      "43": 101,
+      "44": 102,
+      "45": 103,
+      "46": 104,
+      "47": 35,
+      "48": 8,
+      "49": 105,
+      "50": 106,
+      "51": 107,
+      "52": 0,
+      "53": 3,
+      "54": 36,
+      "55": 2,
+      "56": 1,
+      "57": 108
+    }
+  }
+}

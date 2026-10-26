@@ -1,2 +1,0 @@
-dataset,corruption,severity,num_images,accuracy,macro_f1,weighted_f1
-gtsrb,gaussian_noise,1,20,1.0000,1.0000,1.0000

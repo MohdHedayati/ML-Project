@@ -18,15 +18,15 @@ Each model in the project must reside in its own dedicated directory under `mode
 
 ```text
 models/
-├── baseline/
-│   └── model.py          # Baseline CNN implementation
+├── adabn/
+│   └── model.py          # AdaBN CNN implementation
 └── <new_model_name>/
     └── model.py          # New model class adhering to this interface
 ```
 
 Import model classes directly from their module:
 ```python
-from models.baseline.model import Baseline
+from models.adabn.model import AdaBN
 ```
 
 ---
