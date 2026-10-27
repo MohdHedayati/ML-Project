@@ -69,6 +69,8 @@ def main():
     parser = argparse.ArgumentParser(description="Evaluate Traffic Sign Recognition Models (Clean + Robustness Benchmark)")
     parser.add_argument('--model', type=str, default=None,
                         help="Model name to evaluate (optional; if omitted, an interactive prompt is shown).")
+    parser.add_argument('--dataset', type=str, default='gtsrb', choices=['gtsrb', 'btsd', 'ctsd'],
+                        help="Dataset benchmark to evaluate: 'gtsrb' (default: 43 classes), 'btsd' (62 classes), or 'ctsd' (58 classes).")
     parser.add_argument('--data-dir', type=str, default='data',
                         help="Root directory for dataset files (default: 'data').")
     parser.add_argument('--target-size', type=int, default=49,
@@ -138,7 +140,8 @@ def main():
     # Dynamically load the selected class from its folder
     selected_model_cls = load_model_class(selected_name, 'models')
     print(f"\n--> Loaded class '{selected_model_cls.__name__}' dynamically from models/{selected_name}/model.py")
-    print(f"--> Selected model: {selected_name.upper()}\n")
+    print(f"--> Selected model: {selected_name.upper()}")
+    print(f"--> Selected dataset: {args.dataset.upper()}\n")
 
     # Initialize evaluator (eval handles hardware detection & dataset loading)
     evaluator = Evaluator(
@@ -152,6 +155,7 @@ def main():
     evaluator.eval_model(
         model_cls_or_instance=selected_model_cls,
         model_name=selected_name,
+        dataset=args.dataset,
         output_dir=args.output_dir,
         epochs=args.epochs,
         batch_size=args.batch_size,

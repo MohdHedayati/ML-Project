@@ -1,60 +1,22 @@
 """
-Unified Multi-Dataset Loader Module for Traffic Sign Recognition.
+Dataset Loader Module for Traffic Sign Recognition.
 
-Combines all 3 international traffic sign benchmarks into a single, unified dataset
-with authoritative semantic label mapping:
-- GTSRB (German Traffic Sign Recognition Benchmark) — 43 classes (Germany)
-- BTSD (Belgian Traffic Sign Dataset) — 62 classes (Belgium)
-- CTSD (Chinese Traffic Sign Database) — 58 classes (China)
+Supports loading 3 independent traffic sign benchmarks:
+- GTSRB (German Traffic Sign Recognition Benchmark) — 43 classes (DEFAULT)
+- BTSD (Belgian Traffic Sign Dataset) — 62 classes
+- CTSD (Chinese Traffic Sign Database) — 58 classes
 
-Total unified semantic classes: 109 (indexed from 0 to 108)
-Replaces previous label offsets (0..42, 43..104, 105..162) with semantic equivalence
-where equivalent signs across countries (e.g. Stop, Yield, No Entry, Roundabout, etc.)
-share identical unified class IDs while country-specific signs retain unique IDs.
-
-Every sample preserves:
-- image path
-- unified semantic label ID
-- original dataset name ('gtsrb', 'btsd', 'ctsd')
-- original class ID
-- country of origin ('Germany', 'Belgium', 'China')
+By default, loads GTSRB. The source for loading images changes based on the selected dataset,
+while keeping everything else in the pipeline identical.
 """
 
 import os
-import json
 import pandas as pd
 from PIL import Image
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
 from sklearn.model_selection import train_test_split
-
-# ---------------------------------------------------------------------------
-# Load Unified Semantic Label Mapping
-# ---------------------------------------------------------------------------
-_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-_MAPPING_CANDIDATES = [
-    os.path.join(_CURRENT_DIR, 'unified_label_mapping.json'),
-    os.path.join('.', 'unified_label_mapping.json'),
-    'unified_label_mapping.json',
-]
-_MAPPING_FILE = next((p for p in _MAPPING_CANDIDATES if os.path.exists(p)), _MAPPING_CANDIDATES[0])
-
-if os.path.exists(_MAPPING_FILE):
-    with open(_MAPPING_FILE, 'r', encoding='utf-8') as _f:
-        UNIFIED_MAPPING_DATA = json.load(_f)
-else:
-    raise FileNotFoundError(f"Unified label mapping file not found at candidates: {_MAPPING_CANDIDATES}")
-
-TOTAL_CLASSES = UNIFIED_MAPPING_DATA['metadata']['total_unified_classes']  # 109
-UNIFIED_CLASSES = UNIFIED_MAPPING_DATA['unified_classes']
-UNIFIED_CLASS_NAMES = [c['name'] for c in UNIFIED_CLASSES]
-
-# Fast O(1) integer lookup mappings: {dataset: {orig_id: unified_id}}
-UNIFIED_MAPPINGS = {
-    ds: {int(k): int(v) for k, v in m.items()}
-    for ds, m in UNIFIED_MAPPING_DATA['mappings'].items()
-}
 
 DATASET_CLASSES = {
     'gtsrb': 43,
@@ -68,22 +30,25 @@ DATASET_COUNTRIES = {
     'ctsd': 'China',
 }
 
+DEFAULT_DATASET = 'gtsrb'
+TOTAL_CLASSES = 43  # Default GTSRB class count for pipeline compatibility
+NUM_CLASSES = 43
+
 
 class TrafficSignDataset(Dataset):
     """
-    Unified Dataset class that loads and combines images from GTSRB, BTSD, and CTSD
-    into one single dataset using unified semantic class IDs (109 classes).
+    Dataset loader supporting GTSRB, BTSD, and CTSD datasets.
+    By default, loads GTSRB (43 classes).
     
-    Each sample preserves comprehensive metadata:
+    Each sample preserves:
     - path: filesystem path to image
-    - unified_label: semantic class ID (0 to 108)
-    - dataset: source dataset name ('gtsrb', 'btsd', or 'ctsd')
-    - original_label: raw class ID in the source benchmark
+    - label: native dataset class ID (0 to num_classes - 1)
+    - dataset: source benchmark name ('gtsrb', 'btsd', or 'ctsd')
     - country: country of origin ('Germany', 'Belgium', or 'China')
     """
     def __init__(
         self,
-        dataset='all',
+        dataset='gtsrb',
         split='train',
         root_dir='data',
         target_size=(49, 49),
@@ -103,17 +68,21 @@ class TrafficSignDataset(Dataset):
                 transforms.ToTensor()
             ])
 
-        # Normalize dataset selector
-        ds_str = str(dataset).lower().strip() if dataset is not None else 'all'
-        if ds_str in ['all', 'combined', 'universal', 'merged']:
-            self.active_datasets = ['gtsrb', 'btsd', 'ctsd']
-            self.num_classes = TOTAL_CLASSES
-        else:
-            self.active_datasets = [ds_str]
-            self.num_classes = TOTAL_CLASSES
+        # Normalize dataset selector (default: gtsrb)
+        ds_str = str(dataset).lower().strip() if dataset is not None else DEFAULT_DATASET
+        if ds_str not in DATASET_CLASSES:
+            ds_str = DEFAULT_DATASET
+        self.dataset_name = ds_str
+        self.num_classes = DATASET_CLASSES[self.dataset_name]
+        self.country = DATASET_COUNTRIES[self.dataset_name]
 
         self.samples = []
-        self._load_all_samples()
+        if self.dataset_name == 'gtsrb':
+            self._load_gtsrb()
+        elif self.dataset_name == 'btsd':
+            self._load_btsd()
+        elif self.dataset_name == 'ctsd':
+            self._load_ctsd()
 
         self.paths = [s[0] for s in self.samples]
         self.labels = [int(s[1]) for s in self.samples]
@@ -122,18 +91,8 @@ class TrafficSignDataset(Dataset):
         self.cache = [None] * len(self.samples)
         self.pil_cache = [None] * len(self.samples)
 
-    def _load_all_samples(self):
-        """Loads samples from each active dataset mapped to unified semantic class IDs."""
-        for ds_name in self.active_datasets:
-            if ds_name == 'gtsrb':
-                self._load_gtsrb()
-            elif ds_name == 'btsd':
-                self._load_btsd()
-            elif ds_name == 'ctsd':
-                self._load_ctsd()
-
     def _load_gtsrb(self):
-        """Loads GTSRB samples mapped to unified semantic labels."""
+        """Loads GTSRB samples (43 classes)."""
         csv_name = 'Train.csv' if self.split == 'train' else 'Test.csv'
         csv_candidates = [
             os.path.join(self.root_dir, csv_name),
@@ -146,22 +105,21 @@ class TrafficSignDataset(Dataset):
 
         df = pd.read_csv(target_csv)
         csv_dir = os.path.dirname(target_csv) or '.'
-        mapping = UNIFIED_MAPPINGS['gtsrb']
+        
+        # Fast prefix resolution using first sample
+        first_rel = str(df['Path'].iloc[0])
+        cand_prefixes = [self.root_dir, csv_dir, 'data']
+        chosen_prefix = next((p for p in cand_prefixes if os.path.exists(os.path.join(p, first_rel))), self.root_dir)
 
-        for _, row in df.iterrows():
-            rel_path = str(row['Path'])
-            cand_paths = [
-                os.path.join(self.root_dir, rel_path),
-                os.path.join(csv_dir, rel_path),
-                os.path.join('data', rel_path)
-            ]
-            img_path = next((p for p in cand_paths if os.path.exists(p)), cand_paths[0])
-            orig_id = int(row['ClassId'])
-            unified_id = mapping.get(orig_id, orig_id)
-            self.samples.append((img_path, unified_id, 'gtsrb', orig_id, 'Germany'))
+        paths = df['Path'].astype(str).tolist()
+        class_ids = df['ClassId'].astype(int).tolist()
+        self.samples.extend([
+            (os.path.join(chosen_prefix, p).replace('\\', '/'), cid, 'gtsrb', 'Germany')
+            for p, cid in zip(paths, class_ids)
+        ])
 
     def _load_btsd(self):
-        """Loads BTSD samples mapped to unified semantic labels."""
+        """Loads BTSD samples (62 classes)."""
         btsd_root_candidates = [
             os.path.join(self.root_dir, 'btsd'),
             os.path.join(self.root_dir, 'belgium-ts'),
@@ -180,7 +138,6 @@ class TrafficSignDataset(Dataset):
             if not os.path.exists(data_dir):
                 return
 
-        mapping = UNIFIED_MAPPINGS['btsd']
         class_folders = sorted([d for d in os.listdir(data_dir) if os.path.isdir(os.path.join(data_dir, d))])
 
         for cf in class_folders:
@@ -191,21 +148,19 @@ class TrafficSignDataset(Dataset):
                 df = pd.read_csv(csv_file, sep=';')
                 for _, row in df.iterrows():
                     img_path = os.path.join(cpath, str(row['Filename']))
-                    orig_id = int(row['ClassId'])
-                    unified_id = mapping.get(orig_id, orig_id)
-                    self.samples.append((img_path, unified_id, 'btsd', orig_id, 'Belgium'))
+                    class_id = int(row['ClassId'])
+                    self.samples.append((img_path, class_id, 'btsd', 'Belgium'))
             else:
                 try:
-                    orig_id = int(cf)
-                    unified_id = mapping.get(orig_id, orig_id)
+                    class_id = int(cf)
                     for fn in os.listdir(cpath):
                         if fn.lower().endswith(('.png', '.ppm', '.jpg', '.jpeg')):
-                            self.samples.append((os.path.join(cpath, fn), unified_id, 'btsd', orig_id, 'Belgium'))
+                            self.samples.append((os.path.join(cpath, fn), class_id, 'btsd', 'Belgium'))
                 except ValueError:
                     pass
 
     def _load_ctsd(self):
-        """Loads CTSD samples mapped to unified semantic labels."""
+        """Loads CTSD samples (58 classes) with 80/20 train/test split."""
         ctsd_root_candidates = [
             os.path.join(self.root_dir, 'ctsd'),
             os.path.join(self.root_dir, 'chinese-traffic-signs'),
@@ -227,13 +182,11 @@ class TrafficSignDataset(Dataset):
             all_paths, all_labels, test_size=0.20, random_state=42, stratify=all_labels
         )
 
-        mapping = UNIFIED_MAPPINGS['ctsd']
         target_p, target_l = (train_p, train_l) if self.split == 'train' else (test_p, test_l)
 
         for p, orig_l in zip(target_p, target_l):
-            orig_id = int(orig_l)
-            unified_id = mapping.get(orig_id, orig_id)
-            self.samples.append((p, unified_id, 'ctsd', orig_id, 'China'))
+            class_id = int(orig_l)
+            self.samples.append((p, class_id, 'ctsd', 'China'))
 
     def __len__(self):
         return len(self.samples)
@@ -253,69 +206,48 @@ class TrafficSignDataset(Dataset):
         return image, label
 
     def get_pil_image(self, index):
-        """Returns the uncorrupted, original PIL Image and unified label (cached in RAM)."""
+        """Returns uncorrupted, original PIL Image and label (cached in RAM)."""
         cached = self.pil_cache[index]
         if cached is not None:
             return cached, self.labels[index]
 
         img_path, label = self.samples[index][0], self.samples[index][1]
         image = Image.open(img_path).convert('RGB')
-        self.pil_cache[index] = image
+        self.pil_cache[index] = (image, label)
         return image, label
 
     def get_metadata(self, index):
-        """
-        Returns full provenance and semantic metadata for sample at index:
-        path, unified_label, dataset, original_label, country, class_name.
-        """
+        """Returns sample metadata dict."""
         s = self.samples[index]
-        unified_id = int(s[1])
-        class_name = UNIFIED_CLASS_NAMES[unified_id] if unified_id < len(UNIFIED_CLASS_NAMES) else f"Class_{unified_id}"
         return {
             'path': s[0],
-            'unified_label': unified_id,
+            'label': s[1],
             'dataset': s[2],
-            'original_label': int(s[3]),
-            'country': s[4],
-            'class_name': class_name
+            'country': s[3]
         }
 
 
-# Universal aliases
-CombinedTrafficSignDataset = TrafficSignDataset
+# Aliases
 GTSRBDataset = TrafficSignDataset
-BTSDDataset = TrafficSignDataset
-CTSDDataset = TrafficSignDataset
 
 
-def get_train_dataset(dataset='all', root_dir='data', target_size=(49, 49), transform=None, **kwargs):
-    """Loads all 3 datasets combined into a single training set (109 unified classes)."""
-    return TrafficSignDataset(dataset=dataset, split='train', root_dir=root_dir, target_size=target_size, transform=transform, **kwargs)
+def get_train_dataset(dataset='gtsrb', root_dir='data', target_size=(49, 49), **kwargs):
+    """Factory function for training dataset (default: gtsrb)."""
+    return TrafficSignDataset(dataset=dataset, split='train', root_dir=root_dir, target_size=target_size, **kwargs)
 
 
-def get_test_dataset(dataset='all', root_dir='data', target_size=(49, 49), transform=None, **kwargs):
-    """Loads all 3 datasets combined into a single testing set (109 unified classes)."""
-    return TrafficSignDataset(dataset=dataset, split='test', root_dir=root_dir, target_size=target_size, transform=transform, **kwargs)
+def get_test_dataset(dataset='gtsrb', root_dir='data', target_size=(49, 49), **kwargs):
+    """Factory function for test dataset (default: gtsrb)."""
+    return TrafficSignDataset(dataset=dataset, split='test', root_dir=root_dir, target_size=target_size, **kwargs)
 
 
-def get_train_loader(dataset=None, batch_size=64, shuffle=True, num_workers=0, target_size=(49, 49), root_dir='data', **kwargs):
-    """Returns DataLoader for the combined training set."""
-    if dataset is None:
-        dataset = get_train_dataset(root_dir=root_dir, target_size=target_size, **kwargs)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
+def get_train_loader(dataset='gtsrb', batch_size=64, shuffle=True, num_workers=0, target_size=(49, 49), root_dir='data', **kwargs):
+    """Returns DataLoader for training set."""
+    ds = get_train_dataset(dataset=dataset, root_dir=root_dir, target_size=target_size, **kwargs)
+    return DataLoader(ds, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
 
 
-def get_test_loader(dataset=None, batch_size=64, shuffle=False, num_workers=0, target_size=(49, 49), root_dir='data', **kwargs):
-    """Returns DataLoader for the combined test set."""
-    if dataset is None:
-        dataset = get_test_dataset(root_dir=root_dir, target_size=target_size, **kwargs)
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
-
-
-if __name__ == "__main__":
-    train_ds = get_train_dataset()
-    test_ds = get_test_dataset()
-    img, lbl = train_ds[0]
-    meta = train_ds.get_metadata(0)
-    print(f"Combined Dataset: Train={len(train_ds):,}, Test={len(test_ds):,}, Classes={train_ds.num_classes}, Shape={tuple(img.shape)}")
-    print(f"Sample 0 Metadata: {meta}")
+def get_test_loader(dataset='gtsrb', batch_size=64, shuffle=False, num_workers=0, target_size=(49, 49), root_dir='data', **kwargs):
+    """Returns DataLoader for test set."""
+    ds = get_test_dataset(dataset=dataset, root_dir=root_dir, target_size=target_size, **kwargs)
+    return DataLoader(ds, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)

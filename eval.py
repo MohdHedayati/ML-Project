@@ -1,16 +1,16 @@
 """
 Model-Agnostic Evaluation Pipeline for Traffic Sign Recognition.
 
-Handles dataset loading, hardware setup (CUDA/CPU), clean evaluation, and 
-corruption robustness benchmarks. Completely model-agnostic: does NOT import 
-any specific neural network model. Any model adhering to the project interface 
-can be evaluated by passing its class or instance.
+Handles dataset loading (GTSRB by default, with BTSD and CTSD support),
+hardware setup (CUDA/CPU), clean evaluation, and corruption robustness benchmarks.
+Outputs are stored in dedicated dataset folders (e.g. output/<model>/<dataset>/noise/)
+with dataset-tagged artifacts to preserve results across runs.
 
 Methods:
-- test_without_noise: evaluates clean test data, saves confusion matrix to <output_dir>/test_without_noise.pdf
+- test_without_noise: evaluates clean test data, saves confusion matrix to <output_dir>/test_without_noise_<dataset>.pdf
 - test_with_noise: evaluates across 14 noise types x 5 severities,
   saves 14 confusion matrices to <output_dir>/noise/<noise>_severity_5.pdf,
-  saves robustness_degradation.pdf and robustness_results.csv to <output_dir>/
+  saves robustness_degradation_<dataset>.pdf and robustness_results_<dataset>.csv
 - eval_model: orchestrates dataset loading, hardware detection, training/checkpoint loading,
   clean evaluation, and robustness benchmarks for any passed model.
 """
@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, ConfusionMatrixDisplay
 from tqdm import tqdm
 
-from dataset_loader import get_train_dataset, get_test_dataset, TOTAL_CLASSES
+from dataset_loader import get_train_dataset, get_test_dataset, DATASET_CLASSES
 from noise import NOISE_TYPES, CorruptedGTSRBDataset
 
 
@@ -53,13 +53,14 @@ class Evaluator:
         self.num_workers = num_workers if num_workers is not None else 0
         print(f"[Evaluator] Initialized on device: {self.device} (Target Size: {self.target_size}, Workers: {self.num_workers})")
 
-    def test_without_noise(self, model_instance, test_dataset, output_dir, batch_size=64):
+    def test_without_noise(self, model_instance, test_dataset, output_dir, batch_size=64, dataset='gtsrb'):
         """
         Evaluates the model on clean test data scaled to target_size.
-        Generates and saves a confusion matrix to <output_dir>/test_without_noise.pdf.
+        Generates and saves a confusion matrix to <output_dir>/test_without_noise_<dataset>.pdf.
         """
         os.makedirs(output_dir, exist_ok=True)
-        pdf_path = os.path.join(output_dir, 'test_without_noise.pdf')
+        tag = f"_{dataset.lower()}" if dataset else ""
+        pdf_path = os.path.join(output_dir, f'test_without_noise{tag}.pdf')
 
         print(f"\n[Evaluator] Running clean evaluation in '{output_dir}'...")
         all_preds, all_labels = model_instance.test(test_dataset, batch_size=batch_size, device=self.device)
@@ -67,17 +68,20 @@ class Evaluator:
         acc = accuracy_score(all_labels, all_preds) * 100
         macro_f1 = f1_score(all_labels, all_preds, average='macro')
 
-        print(f"--- CLEAN EVALUATION RESULTS ---")
+        print(f"--- CLEAN EVALUATION RESULTS ({dataset.upper()}) ---")
         print(f"Accuracy: {acc:.2f}% | Macro F1-Score: {macro_f1:.4f}")
 
+        # Determine class count dynamically from model or dataset
+        num_classes = getattr(model_instance, 'num_classes', getattr(test_dataset, 'num_classes', 43))
+        labels_range = list(range(num_classes))
+
         # Generate and save confusion matrix
-        fig, ax = plt.subplots(figsize=(14, 14))
-        labels_range = list(range(TOTAL_CLASSES))
+        fig, ax = plt.subplots(figsize=(12, 12))
         cm = confusion_matrix(all_labels, all_preds, labels=labels_range)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(ax=ax, cmap='Blues', colorbar=False, include_values=False)
         plt.title(
-            f"Confusion Matrix (Clean Data - {TOTAL_CLASSES} Unified Classes - {self.target_size[0]}x{self.target_size[1]})",
+            f"Confusion Matrix (Clean Data - {dataset.upper()} - {num_classes} Classes - {self.target_size[0]}x{self.target_size[1]})",
             fontsize=14
         )
         plt.tight_layout()
@@ -93,18 +97,10 @@ class Evaluator:
             'pdf_path': pdf_path
         }
 
-    def test_with_noise(self, model_instance, test_dataset, output_dir, batch_size=128, num_workers=None, pre_test_hook=None):
+    def test_with_noise(self, model_instance, test_dataset, output_dir, batch_size=128, num_workers=None, pre_test_hook=None, dataset='gtsrb'):
         """
         Evaluates the model across 14 noise types at 5 severity levels (70 experiments).
-        
-        Args:
-            model_instance: Model instance conforming to model interface contract.
-            test_dataset: PyTorch Dataset of test samples.
-            output_dir: Destination directory for artifacts and matrices.
-            batch_size: Mini-batch size for DataLoader.
-            num_workers: Multiprocessing worker count for parallel noise generation.
-            pre_test_hook: Optional callable `pre_test_hook(model_instance, corrupted_loader)`
-                           invoked before evaluating each corruption (e.g. test-time adaptation).
+        Outputs are saved in the dedicated <output_dir>/noise/ folder and tagged with the dataset name.
         """
         if num_workers is None:
             num_workers = self.num_workers
@@ -122,15 +118,16 @@ class Evaluator:
         if num_workers > 0:
             loader_kwargs['prefetch_factor'] = 2
 
+        num_classes = getattr(model_instance, 'num_classes', getattr(test_dataset, 'num_classes', 43))
         hook_status = f" [Pre-Test Hook Active]" if pre_test_hook else ""
-        print(f"\n[Evaluator] Running robustness benchmark{hook_status} across {len(NOISE_TYPES)} corruptions x 5 severities...")
-        print(f"[Evaluator] Output directory: '{output_dir}'")
+        print(f"\n[Evaluator] Running robustness benchmark ({dataset.upper()}){hook_status} across {len(NOISE_TYPES)} corruptions x 5 severities...")
+        print(f"[Evaluator] Noise folder: '{noise_dir}'")
 
         source_state = copy.deepcopy(model_instance.state_dict())
 
         results = []
         total_experiments = len(NOISE_TYPES) * 5
-        progress_bar = tqdm(total=total_experiments, desc="Robustness Benchmark", leave=True)
+        progress_bar = tqdm(total=total_experiments, desc=f"Robustness Benchmark ({dataset.upper()})", leave=True)
 
         for noise_type in NOISE_TYPES:
             for severity in range(1, 6):
@@ -155,12 +152,15 @@ class Evaluator:
                     self._save_severity_confusion_matrix(
                         labels=labels,
                         preds=preds,
+                        num_classes=num_classes,
                         noise_type=noise_type,
                         severity=5,
-                        save_path=os.path.join(noise_dir, f"{noise_type}_severity_5.pdf")
+                        save_path=os.path.join(noise_dir, f"{noise_type}_severity_5.pdf"),
+                        dataset=dataset
                     )
 
                 results.append({
+                    'Dataset': dataset.upper(),
                     'Noise_Type': noise_type,
                     'Severity': severity,
                     'Accuracy': round(acc, 2),
@@ -178,28 +178,29 @@ class Evaluator:
         results.sort(key=lambda x: (NOISE_TYPES.index(x['Noise_Type']), x['Severity']))
         results_df = pd.DataFrame(results)
 
-        csv_path = os.path.join(output_dir, 'robustness_results.csv')
+        tag = f"_{dataset.lower()}" if dataset else ""
+        csv_path = os.path.join(output_dir, f'robustness_results{tag}.csv')
         results_df.to_csv(csv_path, index=False)
         print(f"[Evaluator] Robustness results saved to: '{csv_path}'")
 
-        plot_path = os.path.join(output_dir, 'robustness_degradation.pdf')
-        self.plot_robustness(results_df, plot_path)
+        plot_path = os.path.join(output_dir, f'robustness_degradation{tag}.pdf')
+        self.plot_robustness(results_df, plot_path, dataset=dataset)
 
         return results_df
 
-    def _save_severity_confusion_matrix(self, labels, preds, noise_type, severity, save_path):
+    def _save_severity_confusion_matrix(self, labels, preds, num_classes, noise_type, severity, save_path, dataset='gtsrb'):
         """Helper to render and save severity confusion matrix."""
         fig, ax = plt.subplots(figsize=(12, 12))
-        labels_range = list(range(TOTAL_CLASSES))
+        labels_range = list(range(num_classes))
         cm = confusion_matrix(labels, preds, labels=labels_range)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(ax=ax, cmap='Blues', colorbar=False, include_values=False)
-        plt.title(f"Confusion Matrix: {noise_type} (Severity {severity} - {TOTAL_CLASSES} Unified Classes - {self.target_size[0]}x{self.target_size[1]})")
+        plt.title(f"Confusion Matrix: {noise_type} (Severity {severity} - {dataset.upper()} - {num_classes} Classes - {self.target_size[0]}x{self.target_size[1]})")
         plt.tight_layout()
         plt.savefig(save_path, format="pdf")
         plt.close(fig)
 
-    def plot_robustness(self, results_data, output_path):
+    def plot_robustness(self, results_data, output_path, dataset='gtsrb'):
         """Generates and saves degradation curve plot across 14 corruptions."""
         if isinstance(results_data, str):
             df = pd.read_csv(results_data)
@@ -215,7 +216,7 @@ class Evaluator:
                 label=noise_name.replace('_', ' ').title()
             )
 
-        plt.title(f'Model Accuracy vs. Corruption Severity Across 14 Noise Types ({self.target_size[0]}x{self.target_size[1]})', fontsize=14)
+        plt.title(f'Model Accuracy vs. Corruption Severity ({dataset.upper()} - 14 Noise Types - {self.target_size[0]}x{self.target_size[1]})', fontsize=14)
         plt.xlabel('Severity Level (1 to 5)', fontsize=12)
         plt.ylabel('Test Accuracy (%)', fontsize=12)
         plt.xticks([1, 2, 3, 4, 5])
@@ -233,6 +234,7 @@ class Evaluator:
         self,
         model_cls_or_instance,
         model_name,
+        dataset='gtsrb',
         output_dir=None,
         train_dataset=None,
         test_dataset=None,
@@ -245,43 +247,49 @@ class Evaluator:
     ):
         """
         Main orchestration method:
-        1. Loads datasets if not already supplied.
-        2. Instantiates model if class type was passed.
-        3. Loads checkpoint or trains model.
-        4. Configures adaptation hook if model provides one (e.g. adapt_bn).
-        5. Runs clean evaluation and corrupted benchmark.
+        1. Loads specified dataset ('gtsrb' by default, or 'btsd', 'ctsd').
+        2. Sets dedicated output folder: output/<model_name>/<dataset>/
+        3. Instantiates model if class type was passed.
+        4. Loads checkpoint or trains model.
+        5. Configures adaptation hook if model provides one (e.g. adapt_bn).
+        6. Runs clean evaluation and corrupted benchmark with dataset tags.
         """
-        output_dir = output_dir or os.path.join('output', model_name)
-        os.makedirs(output_dir, exist_ok=True)
+        ds_name = str(dataset).lower().strip()
+        # Dedicated subfolder for this model + dataset combination
+        dataset_output_dir = output_dir or os.path.join('output', model_name, ds_name)
+        os.makedirs(dataset_output_dir, exist_ok=True)
         workers = num_workers if num_workers is not None else self.num_workers
 
+        # 1. Dataset loading handled directly by eval (defaults to gtsrb)
+        if train_dataset is None:
+            print(f"[Evaluator] Loading training dataset '{ds_name}' from '{self.data_dir}' (Target: {self.target_size})...")
+            train_dataset = get_train_dataset(dataset=ds_name, root_dir=self.data_dir, target_size=self.target_size)
+        if test_dataset is None:
+            print(f"[Evaluator] Loading test dataset '{ds_name}' from '{self.data_dir}' (Target: {self.target_size})...")
+            test_dataset = get_test_dataset(dataset=ds_name, root_dir=self.data_dir, target_size=self.target_size)
+
+        num_classes = getattr(train_dataset, 'num_classes', DATASET_CLASSES.get(ds_name, 43))
         print(f"\n==========================================")
-        print(f" Starting Evaluation Pipeline -> {output_dir}")
+        print(f" Starting Evaluation Pipeline -> {dataset_output_dir}")
         print(f" Model: {model_name}")
-        print(f" Datasets: Combined Multi-Domain ({TOTAL_CLASSES} Unified Semantic Classes)")
+        print(f" Dataset: {ds_name.upper()} ({num_classes} Classes, {len(train_dataset):,} train / {len(test_dataset):,} test)")
         print(f" Hardware: {self.device} | Target: {self.target_size[0]}x{self.target_size[1]} | Workers: {workers}")
         print(f"==========================================")
 
-        # 1. Dataset loading handled directly by eval
-        if train_dataset is None:
-            print(f"[Evaluator] Loading training dataset from '{self.data_dir}' (Target: {self.target_size})...")
-            train_dataset = get_train_dataset(root_dir=self.data_dir, target_size=self.target_size)
-        if test_dataset is None:
-            print(f"[Evaluator] Loading test dataset from '{self.data_dir}' (Target: {self.target_size})...")
-            test_dataset = get_test_dataset(root_dir=self.data_dir, target_size=self.target_size)
-        print(f"[Evaluator] Datasets ready: {len(train_dataset):,} train, {len(test_dataset):,} test samples.")
-
         # 2. Model preparation (agnostic: accepts class or instance)
         if isinstance(model_cls_or_instance, type):
-            model = model_cls_or_instance(num_classes=TOTAL_CLASSES)
+            model = model_cls_or_instance(num_classes=num_classes)
         else:
             model = model_cls_or_instance
 
-        # 3. Checkpoint resolution & loading
+        # 3. Checkpoint resolution & loading (checks dataset folder, model root, and models/)
         if weights_path is None:
             candidates = [
-                os.path.join(output_dir, f"{model_name}_model.pth"),
-                os.path.join(output_dir, 'model.pth'),
+                os.path.join(dataset_output_dir, f"{model_name}_model.pth"),
+                os.path.join(dataset_output_dir, f"{model_name}_{ds_name}.pth"),
+                os.path.join('output', model_name, f"{model_name}_model.pth"),
+                os.path.join(dataset_output_dir, 'model.pth'),
+                os.path.join('output', model_name, 'model.pth'),
                 os.path.join('models', model_name, f"{model_name}_model.pth"),
             ]
             weights_path = next((c for c in candidates if os.path.exists(c)), candidates[0])
@@ -292,13 +300,13 @@ class Evaluator:
 
         # 4. Training if no weights loaded
         if not weights_loaded:
-            print(f"[Evaluator] Training {model_name} on training dataset...")
+            print(f"[Evaluator] Training {model_name} on {ds_name.upper()} training dataset...")
             model.train(
                 dataset_or_mode=train_dataset,
                 epochs=epochs,
                 batch_size=batch_size,
                 device=self.device,
-                save_dir=output_dir
+                save_dir=dataset_output_dir
             )
 
         # 5. Generic pre-test adaptation hook (auto-detected if model defines adapt_bn or adapt)
@@ -308,30 +316,33 @@ class Evaluator:
             elif hasattr(model, 'adapt'):
                 pre_test_hook = lambda m, loader: m.adapt(loader, device=self.device)
 
-        # 6. Clean evaluation
+        # 6. Clean evaluation (tagged with dataset)
         clean_results = self.test_without_noise(
             model_instance=model,
             test_dataset=test_dataset,
-            output_dir=output_dir,
-            batch_size=batch_size
+            output_dir=dataset_output_dir,
+            batch_size=batch_size,
+            dataset=ds_name
         )
 
-        # 7. Robustness corrupted benchmark
+        # 7. Robustness corrupted benchmark (tagged with dataset and saved to dedicated noise folder)
         robustness_results = self.test_with_noise(
             model_instance=model,
             test_dataset=test_dataset,
-            output_dir=output_dir,
+            output_dir=dataset_output_dir,
             batch_size=batch_size * 2,
             num_workers=workers,
-            pre_test_hook=pre_test_hook
+            pre_test_hook=pre_test_hook,
+            dataset=ds_name
         )
 
         print(f"\n==========================================")
-        print(f" Finished Pipeline for {model_name}. Artifacts stored in: '{output_dir}/'")
+        print(f" Finished Pipeline for {model_name} on {ds_name.upper()}.")
+        print(f" Artifacts preserved in: '{dataset_output_dir}/'")
         print(f"==========================================\n")
 
         return {
-            'output_dir': output_dir,
+            'output_dir': dataset_output_dir,
             'clean_metrics': clean_results,
             'robustness_df': robustness_results
         }

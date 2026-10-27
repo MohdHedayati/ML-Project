@@ -17,10 +17,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
-try:
-    from dataset_loader import TOTAL_CLASSES
-except ImportError:
-    TOTAL_CLASSES = 109
+TOTAL_CLASSES = 43
 
 
 class AdaBN(nn.Module):
@@ -30,7 +27,7 @@ class AdaBN(nn.Module):
     followed by fully-connected classifier layers with BatchNorm1d.
     Supports Adaptive Batch Normalization (AdaBN) for test-time domain adaptation.
     """
-    def __init__(self, num_classes=TOTAL_CLASSES):
+    def __init__(self, num_classes=43):
         super(AdaBN, self).__init__()
         self.num_classes = num_classes
 
@@ -139,10 +136,10 @@ class AdaBN(nn.Module):
             meta_content = {
                 "model_name": "AdaBN",
                 "num_classes": self.num_classes,
-                "total_unified_classes": TOTAL_CLASSES,
+                
                 "input_size": [3, 49, 49],
                 "dataset": "GTSRB + BTSD + CTSD (Unified)",
-                "mapping_file": "unified_label_mapping.json",
+                
                 "epochs": epochs,
                 "loss": epoch_loss,
                 "accuracy": epoch_acc
@@ -255,6 +252,6 @@ TrafficSignNet = AdaBN
 
 
 if __name__ == "__main__":
-    model = AdaBN(num_classes=TOTAL_CLASSES)
+    model = AdaBN(num_classes=43)
     x = torch.randn(2, 3, 49, 49)
-    print(f"[AdaBN] Forward pass: {x.shape} -> {model(x).shape} (Classes={TOTAL_CLASSES})")
+    print(f"[AdaBN] Forward pass: {x.shape} -> {model(x).shape} (Classes={model.num_classes})")

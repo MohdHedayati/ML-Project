@@ -1,14 +1,14 @@
 ---
 name: model-interface
 description: >-
-  Defines the architecture and interface contract for GTSRB traffic sign recognition models evaluated by eval.py.
+  Defines the architecture and interface contract for traffic sign recognition models evaluated by eval.py.
   Use this skill whenever implementing, refactoring, or integrating a new neural network model
   into the project to ensure seamless compatibility with dataset loading, clean evaluation, and robustness benchmarks.
 ---
 
 # Modular Model Interface Specification
 
-This skill documents the standard architecture interface, lifecycle contract, and directory conventions required for models plugging into the modular evaluation pipeline (`eval.py`).
+This skill documents the standard architecture interface, lifecycle contract, directory conventions, and output artifact preservation required for models plugging into the modular evaluation pipeline (`eval.py`).
 
 ---
 
@@ -18,15 +18,19 @@ Each model in the project must reside in its own dedicated directory under `mode
 
 ```text
 models/
+├── baseline/
+│   └── model.py          # Baseline CNN architecture
 ├── adabn/
-│   └── model.py          # AdaBN CNN implementation
+│   └── model.py          # AdaBN CNN architecture
+├── aco/
+│   └── model.py          # Ant Colony Optimization feature gating CNN
 └── <new_model_name>/
     └── model.py          # New model class adhering to this interface
 ```
 
-Import model classes directly from their module:
+Import model classes dynamically or directly:
 ```python
-from models.adabn.model import AdaBN
+from models.baseline.model import Baseline
 ```
 
 ---
@@ -36,7 +40,7 @@ from models.adabn.model import AdaBN
 Any model class evaluated by `Evaluator.eval_model(model_cls, model_name)` must conform to the following interface:
 
 ### 2.1 Class Signature & Inheritance
-The model must inherit from `torch.nn.Module`:
+The model must inherit from `torch.nn.Module` and accept `num_classes` (defaulting to 43 for GTSRB):
 
 ```python
 import torch.nn as nn
@@ -44,12 +48,13 @@ import torch.nn as nn
 class MyModel(nn.Module):
     def __init__(self, num_classes=43):
         super(MyModel, self).__init__()
+        self.num_classes = num_classes
         # Layers definition...
 ```
 
 ### 2.2 Input & Output Dimensions
 * **Input tensor**: `(Batch_Size, 3, 49, 49)` (RGB images scaled down to $49 \times 49$ pixels).
-* **Output logits**: `(Batch_Size, 43)` (unnormalized raw logits for the 43 GTSRB classes).
+* **Output logits**: `(Batch_Size, num_classes)` (unnormalized raw logits for the target benchmark).
 
 ```python
     def forward(self, x):
@@ -88,8 +93,8 @@ The evaluator uses `test` for both clean evaluation (`test_without_noise`) and c
         """
 ```
 
-### 2.5 Weight Loading Helper `load_weights(...)` (Recommended)
-Allows `eval.py` to optionally skip retraining if saved weights already exist in `output/<model_name>/`:
+### 2.5 Weight Loading Helper `load_weights(...)`
+Allows `eval.py` to optionally skip retraining if saved weights already exist in `output/<model_name>/` or `output/<model_name>/<dataset>/`:
 
 ```python
     def load_weights(self, weights_path=None):
@@ -98,64 +103,45 @@ Allows `eval.py` to optionally skip retraining if saved weights already exist in
 
 ---
 
-## 3. How `eval.py` Interacts with the Model
+## 3. Dedicated Dataset Output Structure & Asset Preservation
 
-When you call `Evaluator.eval_model(model_cls, model_name)`:
+To ensure that running benchmarks across different datasets (`gtsrb`, `btsd`, `ctsd`) **never overwrites or wipes out another dataset's assets**, all outputs are stored in dedicated dataset folders with tagged filenames:
 
-1. **Instantiation**: `model_instance = model_cls(num_classes=43)`
-2. **Dataset Loading**: Loads GTSRB Train and Test sets scaled to $49 \times 49$.
-3. **Training**: Calls `model_instance.train(train_dataset, ...)` (or loads existing checkpoint).
-4. **Clean Evaluation**: Calls `Evaluator.test_without_noise(model_instance, test_dataset, model_name)`, which executes `model_instance.test(...)` and writes `output/<model_name>/test_without_noise.pdf`.
-5. **Corruption Benchmark**: Calls `Evaluator.test_with_noise(model_instance, test_dataset, model_name)`, which applies all 14 corruptions at 5 severities via `noise.py` with parallelized workers and writes:
-   - `output/<model_name>/noise/<noise_type>_severity_5.pdf` (14 confusion matrices)
-   - `output/<model_name>/robustness_degradation.pdf`
-   - `output/<model_name>/robustness_results.csv`
+```text
+output/
+└── <model_name>/
+    ├── <model_name>_model.pth                    # Global model weights
+    └── <dataset>/                                # Dedicated dataset folder (e.g. gtsrb, btsd, ctsd)
+        ├── noise/                                # Dedicated noise confusion matrices
+        │   ├── brightness_severity_5.pdf
+        │   ├── contrast_severity_5.pdf
+        │   ├── ... (14 corruptions)
+        │   └── zoom_blur_severity_5.pdf
+        ├── test_without_noise_<dataset>.pdf      # Dataset-tagged clean matrix
+        ├── robustness_degradation_<dataset>.pdf  # Dataset-tagged degradation curve plot
+        └── robustness_results_<dataset>.csv      # Dataset-tagged numerical benchmark metrics
+```
+
+### Supported Datasets:
+* **`gtsrb`** (German — 43 classes): Default benchmark.
+* **`btsd`** (Belgian — 62 classes): Regional European benchmark.
+* **`ctsd`** (Chinese — 58 classes): Asian benchmark.
 
 ---
 
-## 4. Boilerplate Template for Adding a New Model
+## 4. How `eval.py` and `cli.py` Interact with Models
 
-To add a new model (e.g. `resnet18` or `mobilenet`):
-
-```python
-# models/<model_name>/model.py
-import os
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
-from tqdm import tqdm
-
-class MyModel(nn.Module):
-    def __init__(self, num_classes=43):
-        super(MyModel, self).__init__()
-        self.num_classes = num_classes
-        # Define architecture for (B, 3, 49, 49) inputs
-        ...
-
-    def forward(self, x):
-        return ...
-
-    def train(self, dataset_or_mode=True, epochs=5, batch_size=64, lr=0.001, device=None, save_dir=None, **kwargs):
-        if isinstance(dataset_or_mode, bool) and not kwargs and epochs == 5 and batch_size == 64:
-            return super().train(mode=dataset_or_mode)
-        
-        # Training loop implementation
-        ...
-
-    def test(self, test_dataset_or_loader, batch_size=64, device=None):
-        # Inference implementation returning (all_preds, all_labels)
-        ...
-
-    def load_weights(self, weights_path=None):
-        # Checkpoint loading
-        ...
+When evaluating a model:
+```bash
+python cli.py --model baseline --dataset gtsrb
 ```
 
-Then in `eval.py`:
-```python
-if __name__ == "__main__":
-    from models.my_model.model import MyModel
-    evaluator = Evaluator()
-    evaluator.eval_model(MyModel, model_name="my_model")
-```
+1. **Model Discovery**: `cli.py` dynamically scans `models/` for available models.
+2. **Dataset Loading**: `eval.py` loads the requested dataset (`gtsrb` by default) and determines `num_classes`.
+3. **Dedicated Output Setup**: Sets output directory to `output/<model_name>/<dataset>/` and creates `noise/`.
+4. **Weights Loading**: Resolves weights from `output/<model>/<dataset>/` or `output/<model>/` without unnecessary retraining.
+5. **Clean Evaluation**: Writes `test_without_noise_<dataset>.pdf`.
+6. **Corruption Benchmark**: Runs 14 corruptions across 5 severities and writes:
+   * 14 confusion matrices to `output/<model>/<dataset>/noise/<noise_type>_severity_5.pdf`
+   * Degradation curve to `output/<model>/<dataset>/robustness_degradation_<dataset>.pdf`
+   * Metrics table to `output/<model>/<dataset>/robustness_results_<dataset>.csv`
