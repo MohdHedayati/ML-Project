@@ -64,7 +64,7 @@ class Baseline(nn.Module):
         2. If passed a Dataset or DataLoader, executes the model training loop.
         """
         # Case 1: Standard PyTorch train mode toggle
-        if isinstance(dataset_or_mode, bool) and not kwargs and epochs == 5 and batch_size == 64:
+        if isinstance(dataset_or_mode, bool):
             return super().train(mode=dataset_or_mode)
 
         # Case 2: Executing training on dataset

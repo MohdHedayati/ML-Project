@@ -213,7 +213,7 @@ class TrafficSignDataset(Dataset):
 
         img_path, label = self.samples[index][0], self.samples[index][1]
         image = Image.open(img_path).convert('RGB')
-        self.pil_cache[index] = (image, label)
+        self.pil_cache[index] = image
         return image, label
 
     def get_metadata(self, index):
