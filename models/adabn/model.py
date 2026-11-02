@@ -72,7 +72,7 @@ class AdaBN(nn.Module):
         - train(True/False): PyTorch train mode toggle
         - train(dataset, epochs=..., batch_size=...): Model training loop
         """
-        if isinstance(dataset_or_mode, bool) and not kwargs and epochs == 5 and batch_size == 64:
+        if isinstance(dataset_or_mode, bool):
             return super().train(mode=dataset_or_mode)
 
         train_data = dataset_or_mode

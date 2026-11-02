@@ -34,6 +34,8 @@ NOISE_TYPES = [
 
 
 def add_noise(image, noise_type: str, severity: int = 1):
+    if isinstance(image, tuple):
+        image = image[0]
     """
     Applies corruption noise to an image.
     

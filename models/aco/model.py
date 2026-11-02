@@ -61,6 +61,11 @@ class AntColonyFeatureOptimizer:
         Runs the ant colony optimization loop to find the optimal pheromone distribution
         over convolutional feature channels.
         """
+        if hasattr(feature_extractor, 'eval'):
+            feature_extractor.eval()
+        if hasattr(classifier, 'eval'):
+            classifier.eval()
+
         # 1. Grab a representative batch of images for fitness evaluation
         images, labels = next(iter(sample_loader))
         images, labels = images.to(device), labels.to(device)
@@ -210,7 +215,7 @@ class ACOModel(nn.Module):
            - Saves weights to save_dir/aco_model.pth.
         """
         # Case 1: Standard PyTorch train mode toggle
-        if isinstance(dataset_or_mode, bool) and not kwargs and epochs == 5 and batch_size == 64:
+        if isinstance(dataset_or_mode, bool):
             return super().train(mode=dataset_or_mode)
 
         # Case 2: Executing training on dataset
