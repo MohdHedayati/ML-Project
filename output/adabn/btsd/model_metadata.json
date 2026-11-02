@@ -1,0 +1,13 @@
+{
+  "model_name": "AdaBN",
+  "num_classes": 62,
+  "input_size": [
+    3,
+    49,
+    49
+  ],
+  "dataset": "btsd",
+  "epochs": 5,
+  "loss": 0.02339041917326136,
+  "accuracy": 99.82574602483119
+}

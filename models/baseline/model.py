@@ -18,7 +18,7 @@ from tqdm import tqdm
 class Baseline(nn.Module):
     """
     Baseline CNN architecture for 49x49 GTSRB images.
-    Consists of 3 Conv blocks with GELU activations and Dropout,
+    Consists of 3 Conv blocks with ReLU activations and Dropout,
     followed by fully-connected classifier layers.
     """
     def __init__(self, num_classes=43):
@@ -27,24 +27,24 @@ class Baseline(nn.Module):
 
         # Block 1
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
-        self.act1 = nn.GELU()
+        self.act1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # Block 2
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.act2 = nn.GELU()
+        self.act2 = nn.ReLU()
         self.drop1 = nn.Dropout2d(p=0.2)
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # Block 3
         self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
-        self.act3 = nn.GELU()
+        self.act3 = nn.ReLU()
         self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # Classifier: after three 2x2 poolings, 49x49 becomes 6x6. 128 * 6 * 6 = 4608 features.
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(4608, 512)
-        self.act4 = nn.GELU()
+        self.act4 = nn.ReLU()
         self.drop2 = nn.Dropout(p=0.5)
         self.fc2 = nn.Linear(512, num_classes)
 
@@ -175,7 +175,11 @@ class Baseline(nn.Module):
                     break
 
         if weights_path and os.path.exists(weights_path):
-            self.load_state_dict(torch.load(weights_path, weights_only=True, map_location='cpu'))
+            state_dict = torch.load(weights_path, weights_only=True, map_location='cpu')
+            if state_dict['fc2.weight'].shape[0] != self.num_classes:
+                print(f"Checkpoint class count does not match {self.num_classes}; retraining required.")
+                return False
+            self.load_state_dict(state_dict)
             print(f"[Baseline] Successfully loaded weights from '{weights_path}'")
             return True
         else:

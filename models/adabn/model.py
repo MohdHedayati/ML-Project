@@ -138,7 +138,7 @@ class AdaBN(nn.Module):
                 "num_classes": self.num_classes,
                 
                 "input_size": [3, 49, 49],
-                "dataset": "GTSRB + BTSD + CTSD (Unified)",
+                "dataset": getattr(train_loader.dataset, 'dataset_name', 'unknown'),
                 
                 "epochs": epochs,
                 "loss": epoch_loss,
