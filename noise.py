@@ -13,9 +13,15 @@ if not hasattr(np, 'complex_'):
     np.complex_ = np.complex128
 
 import os
+import copy
+import hashlib
+import json
+from importlib.metadata import version
+from pathlib import Path
+import tempfile
 from PIL import Image
 import torch
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as transforms
 from imagecorruptions import corrupt
 
@@ -184,4 +190,86 @@ class CorruptedGTSRBDataset(Dataset):
 
 # Backward-compatible alias and universal name
 CorruptedDataset = CorruptedGTSRBDataset
+
+
+def corruption_cache_key(dataset, target_size):
+    if not hasattr(dataset, 'paths') or not hasattr(dataset, 'labels'):
+        return None
+    if len(dataset.paths) != len(dataset) or len(dataset.labels) != len(dataset):
+        raise ValueError('Cache sources and labels must match the dataset length.')
+    sources = []
+    for path, label in zip(dataset.paths, dataset.labels):
+        resolved = Path(path).resolve()
+        stat = resolved.stat()
+        sources.append((str(resolved), stat.st_size, stat.st_mtime_ns, int(label)))
+    signature = {
+        'sources': sources,
+        'size': tuple(target_size),
+        'implementation': hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        'versions': {name: version(name) for name in ('imagecorruptions', 'numpy', 'Pillow', 'scipy', 'scikit-image', 'torchvision')},
+    }
+    return hashlib.sha256(json.dumps(signature, sort_keys=True).encode()).hexdigest()
+
+
+class CachedCorruptedDataset(Dataset):
+    def __init__(self, dataset, cache_dir, batch_size=128, num_workers=0):
+        if dataset.noise_type not in NOISE_TYPES or dataset.severity not in range(1, 6):
+            raise ValueError('Invalid cached corruption type or severity.')
+        self.labels = list(dataset.base_dataset.labels)
+        self.transform = dataset.transform
+        self.path = Path(cache_dir) / f'{dataset.noise_type}_{dataset.severity}.npy'
+        self.images = None
+        width, height = dataset.target_size
+        shape = (len(dataset), height, width, 3)
+        valid = False
+        if self.path.exists():
+            try:
+                saved = np.load(self.path, mmap_mode='r', allow_pickle=False)
+                valid = saved.shape == shape and saved.dtype == np.uint8
+                del saved
+            except (OSError, ValueError, EOFError):
+                pass
+        if valid:
+            print(f'[Cache] Reusing {self.path.name}')
+            return
+
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        print(f'[Cache] Building {self.path.name} ({len(dataset)} images)')
+        raw_dataset = copy.copy(dataset)
+        raw_dataset.transform = transforms.PILToTensor()
+        loader = DataLoader(raw_dataset, batch_size=batch_size, num_workers=num_workers, shuffle=False)
+        descriptor, temporary_path = tempfile.mkstemp(prefix=self.path.stem + '-', suffix='.tmp', dir=self.path.parent)
+        os.close(descriptor)
+        images = None
+        try:
+            images = np.lib.format.open_memmap(temporary_path, mode='w+', dtype=np.uint8, shape=shape)
+            offset = 0
+            for batch, labels in loader:
+                count = len(batch)
+                images[offset:offset + count] = batch.permute(0, 2, 3, 1).numpy()
+                offset += count
+            if offset != len(dataset):
+                raise RuntimeError('Corruption cache did not receive every image.')
+            images.flush()
+            del images
+            images = None
+            os.replace(temporary_path, self.path)
+        finally:
+            if images is not None:
+                del images
+            if os.path.exists(temporary_path):
+                os.unlink(temporary_path)
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, index):
+        if self.images is None:
+            self.images = np.load(self.path, mmap_mode='r', allow_pickle=False)
+        return self.transform(Image.fromarray(self.images[index])), self.labels[index]
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        state['images'] = None
+        return state
 

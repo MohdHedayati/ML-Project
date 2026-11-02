@@ -84,10 +84,14 @@ def main():
     parser.add_argument('--device', type=str, default=None,
                         help="Computation device ('cuda' or 'cpu'). Auto-detected if omitted.")
     parser.add_argument('--output-dir', type=str, default=None,
-                        help="Custom output directory. Defaults to 'output/<model_name>'.")
+                        help="Custom output directory. Defaults to 'output/<model_name>/<dataset>'.")
     parser.add_argument('--weights', type=str, default=None,
                         help="Explicit checkpoint file path to load.")
+    parser.add_argument('--retrain', action='store_true',
+                        help="Train from scratch instead of loading an existing checkpoint.")
     args = parser.parse_args()
+    if args.retrain and args.weights:
+        parser.error('--retrain cannot be combined with --weights.')
 
     # Discover models dynamically from the directory structure
     available_models = discover_available_models('models')
@@ -161,7 +165,7 @@ def main():
         batch_size=args.batch_size,
         num_workers=args.workers,
         weights_path=args.weights,
-        load_if_exists=True
+        load_if_exists=not args.retrain
     )
 
 

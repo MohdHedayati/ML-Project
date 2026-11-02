@@ -139,9 +139,9 @@ class ACOModel(nn.Module):
     for robust GTSRB Traffic Sign Recognition.
     
     Structure:
-    - 3 Conv Blocks with GELU and MaxPool2d (outputs 128 channels at 6x6 for 49x49 inputs).
+    - 3 Conv Blocks with ReLU and MaxPool2d (outputs 128 channels at 6x6 for 49x49 inputs).
     - Pheromone Gate: Continuous channel attention vector optimized by the ant colony.
-    - Fully Connected Classifier: Linear(4608, 512) -> GELU -> Dropout(0.5) -> Linear(512, 43).
+    - Fully Connected Classifier: Linear(4608, 512) -> ReLU -> Dropout(0.5) -> Linear(512, 43).
     """
     def __init__(self, num_classes=43):
         super(ACOModel, self).__init__()
@@ -150,18 +150,18 @@ class ACOModel(nn.Module):
         # Feature Extractor Backbone (3 Blocks)
         # Block 1
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=32, kernel_size=3, padding=1)
-        self.act1 = nn.GELU()
+        self.act1 = nn.ReLU()
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # Block 2
         self.conv2 = nn.Conv2d(in_channels=32, out_channels=64, kernel_size=3, padding=1)
-        self.act2 = nn.GELU()
+        self.act2 = nn.ReLU()
         self.drop1 = nn.Dropout2d(p=0.2)
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # Block 3
         self.conv3 = nn.Conv2d(in_channels=64, out_channels=128, kernel_size=3, padding=1)
-        self.act3 = nn.GELU()
+        self.act3 = nn.ReLU()
         self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
 
         # ACO Pheromone Gating Vector (128 channels)
@@ -172,7 +172,7 @@ class ACOModel(nn.Module):
         # After three 2x2 poolings, a 49x49 image becomes 6x6. 128 * 6 * 6 = 4608 features.
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(4608, 512)
-        self.act4 = nn.GELU()
+        self.act4 = nn.ReLU()
         self.drop2 = nn.Dropout(p=0.5)
         self.fc2 = nn.Linear(512, num_classes)
 
@@ -243,19 +243,22 @@ class ACOModel(nn.Module):
             if epoch == 1:
                 print("\n" + "="*50)
                 print(f"[ACOModel] Launching Ant Colony Optimization Phase...")
-                self.eval()
                 aco = AntColonyFeatureOptimizer(
                     num_channels=128,
                     num_ants=num_ants,
                     num_iterations=aco_iterations,
                     rho=0.15
                 )
-                optimal_gate = aco.optimize(
-                    feature_extractor=self.extract_features,
-                    classifier=self.forward_classifier,
-                    sample_loader=train_loader,
-                    device=device
-                )
+                self.eval()
+                try:
+                    optimal_gate = aco.optimize(
+                        feature_extractor=self.extract_features,
+                        classifier=self.forward_classifier,
+                        sample_loader=train_loader,
+                        device=device
+                    )
+                finally:
+                    self.train(True)
                 # Apply learned pheromone gate to the model
                 self.pheromone_gate.copy_(optimal_gate.view(1, 128, 1, 1))
                 print(f"[ACOModel] Pheromone gate successfully integrated into neural network.")
@@ -344,7 +347,11 @@ class ACOModel(nn.Module):
                     break
 
         if weights_path and os.path.exists(weights_path):
-            self.load_state_dict(torch.load(weights_path, weights_only=True, map_location='cpu'))
+            state_dict = torch.load(weights_path, weights_only=True, map_location='cpu')
+            if state_dict['fc2.weight'].shape[0] != self.num_classes:
+                print(f"Checkpoint class count does not match {self.num_classes}; retraining required.")
+                return False
+            self.load_state_dict(state_dict)
             print(f"[ACOModel] Successfully loaded weights from '{weights_path}'")
             return True
         else:

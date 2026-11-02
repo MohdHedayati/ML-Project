@@ -33,7 +33,7 @@ from sklearn.metrics import accuracy_score, f1_score, confusion_matrix, Confusio
 from tqdm import tqdm
 
 from dataset_loader import get_train_dataset, get_test_dataset, DATASET_CLASSES
-from noise import NOISE_TYPES, CorruptedGTSRBDataset
+from noise import NOISE_TYPES, CorruptedGTSRBDataset, CachedCorruptedDataset, corruption_cache_key
 
 
 class Evaluator:
@@ -124,6 +124,8 @@ class Evaluator:
         print(f"[Evaluator] Noise folder: '{noise_dir}'")
 
         source_state = copy.deepcopy(model_instance.state_dict())
+        cache_key = corruption_cache_key(test_dataset, self.target_size)
+        cache_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'output', '.corruption_cache', cache_key) if cache_key else None
 
         results = []
         total_experiments = len(NOISE_TYPES) * 5
@@ -138,6 +140,8 @@ class Evaluator:
                     target_size=self.target_size
                 )
 
+                if cache_dir:
+                    corrupted_ds = CachedCorruptedDataset(corrupted_ds, cache_dir, batch_size, num_workers)
                 corrupted_loader = DataLoader(corrupted_ds, **loader_kwargs)
 
                 if pre_test_hook is not None:

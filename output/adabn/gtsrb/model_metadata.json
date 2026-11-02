@@ -1,0 +1,13 @@
+{
+  "model_name": "AdaBN",
+  "num_classes": 43,
+  "input_size": [
+    3,
+    49,
+    49
+  ],
+  "dataset": "gtsrb",
+  "epochs": 5,
+  "loss": 0.017784471544026903,
+  "accuracy": 99.5485730317019
+}
